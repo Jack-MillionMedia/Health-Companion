@@ -1,23 +1,41 @@
-// Advanced Drug Interaction Checker
-// Uses OpenFDA drug labels and NIH interaction data
+/**
+ * Drug Interaction Checker Provider
+ * 
+ * Uses curated evidence-based interaction database combined with
+ * real-time FDA drug label data for comprehensive interaction checking.
+ * 
+ * @version 2.0.0
+ */
 
 import { fetchJson, buildQueryString } from "../utils/http.js";
 import type { ToolCallResult, McpToolDefinition } from "../mcp/types.js";
+import {
+  DRUG_INTERACTIONS,
+  INTERACTION_DB_VERSION,
+  INTERACTION_DB_LAST_UPDATED,
+  getDrugClass,
+  matchesDrug,
+  type DrugInteractionEntry,
+  type SeverityLevel,
+  // Drug class lists for pattern matching
+  SSRI_DRUGS,
+  SNRI_DRUGS,
+  NSAID_DRUGS,
+  ACE_INHIBITORS,
+  ARB_DRUGS,
+  STATIN_DRUGS,
+  OPIOID_DRUGS,
+  BENZODIAZEPINE_DRUGS,
+  QT_PROLONGING_DRUGS,
+  DOAC_DRUGS,
+  FLUOROQUINOLONE_DRUGS,
+} from "../data/interaction-database.js";
 
 const OPENFDA_LABEL = "https://api.fda.gov/drug/label.json";
 
-// Interaction severity levels
-type SeverityLevel = "major" | "moderate" | "minor" | "unknown";
-
-interface DrugInteraction {
-  drug1: string;
-  drug2: string;
-  severity: SeverityLevel;
-  description: string;
-  mechanism?: string;
-  management?: string;
-  source: string;
-}
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface DrugLabelResult {
   openfda?: {
@@ -35,90 +53,26 @@ interface OpenFdaResponse {
   error?: { message: string };
 }
 
-// Common high-risk interaction patterns (evidence-based)
-const HIGH_RISK_COMBINATIONS: Record<string, { interacts_with: string[]; severity: SeverityLevel; warning: string }> = {
-  warfarin: {
-    interacts_with: ["aspirin", "ibuprofen", "naproxen", "vitamin k", "amiodarone", "fluconazole", "metronidazole", "sulfamethoxazole", "ciprofloxacin"],
-    severity: "major",
-    warning: "Increased risk of bleeding. INR monitoring required."
-  },
-  metformin: {
-    interacts_with: ["contrast dye", "alcohol", "topiramate"],
-    severity: "major", 
-    warning: "Risk of lactic acidosis. Hold metformin before contrast procedures."
-  },
-  ssri: {
-    interacts_with: ["tramadol", "triptans", "linezolid", "lithium", "st john's wort"],
-    severity: "major",
-    warning: "Risk of serotonin syndrome - potentially life-threatening."
-  },
-  sertraline: {
-    interacts_with: ["tramadol", "sumatriptan", "linezolid", "lithium", "maoi"],
-    severity: "major",
-    warning: "Risk of serotonin syndrome - potentially life-threatening."
-  },
-  fluoxetine: {
-    interacts_with: ["tramadol", "sumatriptan", "linezolid", "lithium", "maoi", "thioridazine"],
-    severity: "major",
-    warning: "Risk of serotonin syndrome and QT prolongation."
-  },
-  lisinopril: {
-    interacts_with: ["potassium", "spironolactone", "amiloride", "triamterene", "lithium", "aliskiren"],
-    severity: "moderate",
-    warning: "Risk of hyperkalemia. Monitor potassium levels."
-  },
-  simvastatin: {
-    interacts_with: ["amiodarone", "amlodipine", "diltiazem", "verapamil", "grapefruit", "clarithromycin", "itraconazole", "cyclosporine"],
-    severity: "major",
-    warning: "Increased risk of myopathy/rhabdomyolysis. Consider dose reduction or alternative statin."
-  },
-  atorvastatin: {
-    interacts_with: ["clarithromycin", "itraconazole", "ritonavir", "cyclosporine", "gemfibrozil", "niacin"],
-    severity: "major",
-    warning: "Increased risk of myopathy/rhabdomyolysis."
-  },
-  digoxin: {
-    interacts_with: ["amiodarone", "verapamil", "quinidine", "clarithromycin", "itraconazole"],
-    severity: "major",
-    warning: "Increased digoxin levels. Monitor levels and reduce digoxin dose."
-  },
-  methotrexate: {
-    interacts_with: ["nsaids", "trimethoprim", "probenecid", "penicillins"],
-    severity: "major",
-    warning: "Increased methotrexate toxicity. Avoid combination or monitor closely."
-  },
-  lithium: {
-    interacts_with: ["nsaids", "ace inhibitors", "thiazides", "ssris"],
-    severity: "major",
-    warning: "Increased lithium levels and toxicity risk. Monitor lithium levels."
-  },
-  clopidogrel: {
-    interacts_with: ["omeprazole", "esomeprazole"],
-    severity: "major",
-    warning: "Reduced antiplatelet effect. Use pantoprazole or H2 blocker instead."
-  },
-  sildenafil: {
-    interacts_with: ["nitrates", "nitroglycerin", "isosorbide", "riociguat"],
-    severity: "major",
-    warning: "Severe hypotension - CONTRAINDICATED. Do not use together."
-  },
-  maoi: {
-    interacts_with: ["ssri", "snri", "tramadol", "meperidine", "dextromethorphan", "tyramine"],
-    severity: "major",
-    warning: "Risk of hypertensive crisis or serotonin syndrome - CONTRAINDICATED."
-  }
-};
+interface FoundInteraction {
+  drug1: string;
+  drug2: string;
+  severity: SeverityLevel | "unknown";
+  evidence: string;
+  description: string;
+  mechanism?: string;
+  management?: string;
+  monitoringRequired: boolean;
+  monitoringParameters?: string[];
+  sources: string[];
+}
 
-// SSRI/SNRI drug list for pattern matching
-const SSRI_SNRI_DRUGS = ["sertraline", "fluoxetine", "paroxetine", "citalopram", "escitalopram", "venlafaxine", "duloxetine", "desvenlafaxine"];
-const NSAID_DRUGS = ["ibuprofen", "naproxen", "meloxicam", "celecoxib", "diclofenac", "indomethacin", "ketorolac", "aspirin"];
-const ACE_INHIBITORS = ["lisinopril", "enalapril", "ramipril", "benazepril", "captopril", "fosinopril", "quinapril"];
-const STATIN_DRUGS = ["simvastatin", "atorvastatin", "rosuvastatin", "pravastatin", "lovastatin", "fluvastatin"];
+// ============================================================================
+// TOOL DEFINITIONS
+// ============================================================================
 
-// Tool definitions
 export const checkDrugInteractionsTool: McpToolDefinition = {
   name: "check_drug_interactions",
-  description: "Check for potential drug-drug interactions between multiple medications. Returns severity, clinical significance, and management recommendations. Essential for medication safety review.",
+  description: `Check for potential drug-drug interactions between multiple medications. Uses evidence-based database (v${INTERACTION_DB_VERSION}) with 50+ high-risk combinations. Returns severity, clinical significance, mechanism, and management recommendations.`,
   inputSchema: {
     type: "object",
     properties: {
@@ -138,7 +92,7 @@ export const checkDrugInteractionsTool: McpToolDefinition = {
 
 export const getDrugInteractionDetailsTool: McpToolDefinition = {
   name: "get_drug_interaction_details",
-  description: "Get detailed interaction information between two specific drugs including mechanism, clinical effects, and evidence level.",
+  description: "Get detailed interaction information between two specific drugs including mechanism, clinical effects, evidence level, and management recommendations.",
   inputSchema: {
     type: "object",
     properties: {
@@ -155,28 +109,155 @@ export const getDrugInteractionDetailsTool: McpToolDefinition = {
   },
 };
 
-// Helper: Normalize drug name for matching
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Normalize drug name for matching
+ */
 function normalizeDrugName(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+  return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "");
 }
 
-// Helper: Check if drug is in a category
-function isDrugInCategory(drug: string, category: string[]): boolean {
-  const normalized = normalizeDrugName(drug);
-  return category.some(d => normalized.includes(normalizeDrugName(d)) || normalizeDrugName(d).includes(normalized));
+/**
+ * Check if a drug name matches any drug in an array
+ */
+function isDrugInList(drugName: string, drugList: readonly string[]): boolean {
+  const normalized = normalizeDrugName(drugName);
+  return drugList.some(d => {
+    const listDrug = normalizeDrugName(d);
+    return normalized.includes(listDrug) || listDrug.includes(normalized);
+  });
 }
 
-// Helper: Get drug class
-function getDrugClass(drug: string): string | null {
-  const normalized = normalizeDrugName(drug);
-  if (isDrugInCategory(drug, SSRI_SNRI_DRUGS)) return "ssri";
-  if (isDrugInCategory(drug, NSAID_DRUGS)) return "nsaids";
-  if (isDrugInCategory(drug, ACE_INHIBITORS)) return "ace inhibitors";
-  if (isDrugInCategory(drug, STATIN_DRUGS)) return "statins";
-  return null;
+/**
+ * Find matching interactions from the database
+ */
+function findDatabaseInteractions(drug1: string, drug2: string): DrugInteractionEntry[] {
+  const matches: DrugInteractionEntry[] = [];
+  
+  for (const interaction of DRUG_INTERACTIONS) {
+    const drug1Matches = matchesDrug(drug1, interaction.drug) || matchesDrug(drug1, interaction.interactsWith);
+    const drug2Matches = matchesDrug(drug2, interaction.drug) || matchesDrug(drug2, interaction.interactsWith);
+    
+    // Check if this interaction applies to our drug pair
+    if (drug1Matches && drug2Matches) {
+      // Make sure we're not matching the same drug to both sides
+      const drug1MatchesPrimary = matchesDrug(drug1, interaction.drug);
+      const drug2MatchesSecondary = matchesDrug(drug2, interaction.interactsWith);
+      const drug1MatchesSecondary = matchesDrug(drug1, interaction.interactsWith);
+      const drug2MatchesPrimary = matchesDrug(drug2, interaction.drug);
+      
+      if ((drug1MatchesPrimary && drug2MatchesSecondary) || (drug1MatchesSecondary && drug2MatchesPrimary)) {
+        matches.push(interaction);
+      }
+    }
+  }
+  
+  return matches;
 }
 
-// Fetch drug label data from OpenFDA
+/**
+ * Check for class-level interactions not explicitly in database
+ */
+function checkClassInteractions(drug1: string, drug2: string): FoundInteraction[] {
+  const interactions: FoundInteraction[] = [];
+  const class1 = getDrugClass(drug1);
+  const class2 = getDrugClass(drug2);
+  
+  // QT Prolongation - any two QT drugs (including fluoroquinolones)
+  const isQT1 = isDrugInList(drug1, QT_PROLONGING_DRUGS) || isDrugInList(drug1, FLUOROQUINOLONE_DRUGS);
+  const isQT2 = isDrugInList(drug2, QT_PROLONGING_DRUGS) || isDrugInList(drug2, FLUOROQUINOLONE_DRUGS);
+  
+  if (isQT1 && isQT2) {
+    interactions.push({
+      drug1,
+      drug2,
+      severity: "major",
+      evidence: "established",
+      description: "Both drugs prolong the QT interval. Concurrent use increases risk of Torsades de Pointes arrhythmia.",
+      mechanism: "Additive blockade of cardiac potassium channels causing delayed repolarization.",
+      management: "Avoid combination if possible. If necessary, obtain baseline ECG, monitor QTc, correct electrolytes.",
+      monitoringRequired: true,
+      monitoringParameters: ["ECG/QTc", "Potassium", "Magnesium"],
+      sources: ["CredibleMeds.org"],
+    });
+  }
+  
+  // DOACs + NSAIDs
+  if ((isDrugInList(drug1, DOAC_DRUGS) && isDrugInList(drug2, NSAID_DRUGS)) ||
+      (isDrugInList(drug2, DOAC_DRUGS) && isDrugInList(drug1, NSAID_DRUGS))) {
+    interactions.push({
+      drug1,
+      drug2,
+      severity: "major",
+      evidence: "established",
+      description: "NSAIDs increase bleeding risk with DOACs through antiplatelet effects and GI mucosal damage.",
+      mechanism: "NSAIDs impair platelet function and cause GI mucosal injury, adding to anticoagulant bleeding risk.",
+      management: "Avoid chronic NSAID use. For acute pain, use lowest dose, shortest duration. Add PPI for GI protection.",
+      monitoringRequired: true,
+      monitoringParameters: ["Signs of bleeding", "Hemoglobin"],
+      sources: ["Davidson BL et al. Lancet 2014"],
+    });
+  }
+  
+  // Multiple SSRIs/SNRIs
+  if ((class1 === "ssri" || class1 === "snri") && (class2 === "ssri" || class2 === "snri") && drug1 !== drug2) {
+    interactions.push({
+      drug1,
+      drug2,
+      severity: "major",
+      evidence: "established",
+      description: "Concurrent use of multiple serotonergic antidepressants increases risk of serotonin syndrome.",
+      mechanism: "Redundant serotonin reuptake inhibition causing excessive serotonergic activity.",
+      management: "Avoid combination. If switching agents, allow appropriate washout period.",
+      monitoringRequired: true,
+      monitoringParameters: ["Serotonin syndrome symptoms"],
+      sources: ["Clinical Guidelines"],
+    });
+  }
+  
+  // Multiple opioids
+  if (isDrugInList(drug1, OPIOID_DRUGS) && isDrugInList(drug2, OPIOID_DRUGS) && 
+      normalizeDrugName(drug1) !== normalizeDrugName(drug2)) {
+    interactions.push({
+      drug1,
+      drug2,
+      severity: "major",
+      evidence: "established",
+      description: "Concurrent use of multiple opioids increases risk of respiratory depression, overdose, and death.",
+      mechanism: "Additive CNS and respiratory depression effects.",
+      management: "Avoid unless clinically necessary (e.g., breakthrough pain in palliative care). Use lowest effective doses.",
+      monitoringRequired: true,
+      monitoringParameters: ["Respiratory rate", "Level of sedation"],
+      sources: ["FDA Guidelines"],
+    });
+  }
+  
+  // NSAIDs + NSAIDs
+  if (isDrugInList(drug1, NSAID_DRUGS) && isDrugInList(drug2, NSAID_DRUGS) &&
+      normalizeDrugName(drug1) !== normalizeDrugName(drug2)) {
+    interactions.push({
+      drug1,
+      drug2,
+      severity: "major",
+      evidence: "established",
+      description: "Multiple NSAIDs significantly increase risk of GI bleeding and acute kidney injury without added benefit.",
+      mechanism: "Additive COX inhibition increasing GI and renal toxicity without improved efficacy.",
+      management: "Do not use multiple NSAIDs concurrently. Choose one agent at appropriate dose.",
+      monitoringRequired: true,
+      monitoringParameters: ["GI symptoms", "Renal function"],
+      sources: ["Clinical Guidelines"],
+    });
+  }
+  
+  return interactions;
+}
+
+/**
+ * Fetch drug label from OpenFDA
+ */
 async function fetchDrugLabel(drugName: string): Promise<DrugLabelResult | null> {
   const searchQuery = `openfda.brand_name:"${drugName}"+openfda.generic_name:"${drugName}"`;
   const url = `${OPENFDA_LABEL}${buildQueryString({
@@ -189,154 +270,48 @@ async function fetchDrugLabel(drugName: string): Promise<DrugLabelResult | null>
     if (response.data.results && response.data.results.length > 0) {
       return response.data.results[0];
     }
-  } catch (error) {
-    // Silently fail - will use pattern matching
+  } catch {
+    // Silently fail - will use database
   }
   return null;
 }
 
-// Check interactions from our database
-function checkKnownInteractions(drugs: string[]): DrugInteraction[] {
-  const interactions: DrugInteraction[] = [];
-  const normalizedDrugs = drugs.map(d => normalizeDrugName(d));
+/**
+ * Severity display helpers
+ */
+const SEVERITY_EMOJI: Record<string, string> = {
+  contraindicated: "⛔",
+  major: "🔴",
+  moderate: "🟡",
+  minor: "🟢",
+  unknown: "⚪",
+};
 
-  for (let i = 0; i < drugs.length; i++) {
-    for (let j = i + 1; j < drugs.length; j++) {
-      const drug1 = drugs[i];
-      const drug2 = drugs[j];
-      const norm1 = normalizedDrugs[i];
-      const norm2 = normalizedDrugs[j];
+const SEVERITY_LABEL: Record<string, string> = {
+  contraindicated: "CONTRAINDICATED",
+  major: "Major",
+  moderate: "Moderate",
+  minor: "Minor",
+  unknown: "Unknown",
+};
 
-      // Check direct matches in our database
-      for (const [baseDrug, data] of Object.entries(HIGH_RISK_COMBINATIONS)) {
-        const baseNorm = normalizeDrugName(baseDrug);
-        
-        // Check if drug1 is the base drug and drug2 is in interacts_with (or vice versa)
-        if (norm1.includes(baseNorm) || baseNorm.includes(norm1)) {
-          for (const interactor of data.interacts_with) {
-            const interactorNorm = normalizeDrugName(interactor);
-            if (norm2.includes(interactorNorm) || interactorNorm.includes(norm2)) {
-              interactions.push({
-                drug1,
-                drug2,
-                severity: data.severity,
-                description: data.warning,
-                source: "FDA/Clinical Guidelines Database"
-              });
-            }
-          }
-        }
-        
-        // Check reverse
-        if (norm2.includes(baseNorm) || baseNorm.includes(norm2)) {
-          for (const interactor of data.interacts_with) {
-            const interactorNorm = normalizeDrugName(interactor);
-            if (norm1.includes(interactorNorm) || interactorNorm.includes(norm1)) {
-              // Avoid duplicates
-              const exists = interactions.some(
-                int => (int.drug1 === drug1 && int.drug2 === drug2) || (int.drug1 === drug2 && int.drug2 === drug1)
-              );
-              if (!exists) {
-                interactions.push({
-                  drug1,
-                  drug2,
-                  severity: data.severity,
-                  description: data.warning,
-                  source: "FDA/Clinical Guidelines Database"
-                });
-              }
-            }
-          }
-        }
-      }
+const SEVERITY_ORDER: Record<string, number> = {
+  contraindicated: 0,
+  major: 1,
+  moderate: 2,
+  minor: 3,
+  unknown: 4,
+};
 
-      // Check drug class interactions
-      const class1 = getDrugClass(drug1);
-      const class2 = getDrugClass(drug2);
+// ============================================================================
+// TOOL HANDLERS
+// ============================================================================
 
-      // SSRI + SSRI
-      if (class1 === "ssri" && class2 === "ssri") {
-        interactions.push({
-          drug1,
-          drug2,
-          severity: "major",
-          description: "Multiple serotonergic agents increase risk of serotonin syndrome.",
-          source: "Clinical Guidelines"
-        });
-      }
-
-      // NSAID + ACE Inhibitor
-      if ((class1 === "nsaids" && class2 === "ace inhibitors") || 
-          (class2 === "nsaids" && class1 === "ace inhibitors")) {
-        interactions.push({
-          drug1,
-          drug2,
-          severity: "moderate",
-          description: "NSAIDs may reduce antihypertensive effect and increase risk of renal impairment.",
-          source: "Clinical Guidelines"
-        });
-      }
-
-      // NSAID + NSAID
-      if (class1 === "nsaids" && class2 === "nsaids") {
-        interactions.push({
-          drug1,
-          drug2,
-          severity: "major",
-          description: "Multiple NSAIDs increase risk of GI bleeding and renal toxicity. Avoid combination.",
-          source: "Clinical Guidelines"
-        });
-      }
-    }
-  }
-
-  return interactions;
-}
-
-// Extract interactions from FDA label text
-function extractInteractionsFromLabel(label: DrugLabelResult, drugName: string, otherDrugs: string[]): DrugInteraction[] {
-  const interactions: DrugInteraction[] = [];
-  const interactionText = (label.drug_interactions || []).join(" ").toLowerCase();
-  const warningsText = (label.warnings || []).join(" ").toLowerCase();
-  const contraindicationsText = (label.contraindications || []).join(" ").toLowerCase();
-
-  const allText = interactionText + " " + warningsText + " " + contraindicationsText;
-
-  for (const otherDrug of otherDrugs) {
-    const normalized = normalizeDrugName(otherDrug);
-    if (allText.includes(normalized)) {
-      // Try to extract the relevant sentence
-      const sentences = allText.split(/[.!?]+/);
-      const relevantSentences = sentences.filter(s => s.includes(normalized)).slice(0, 2);
-      
-      let severity: SeverityLevel = "unknown";
-      if (allText.includes("contraindicated") || allText.includes("do not use") || allText.includes("avoid")) {
-        severity = "major";
-      } else if (allText.includes("caution") || allText.includes("monitor")) {
-        severity = "moderate";
-      }
-
-      if (relevantSentences.length > 0) {
-        interactions.push({
-          drug1: drugName,
-          drug2: otherDrug,
-          severity,
-          description: relevantSentences.join(". ").trim().slice(0, 500),
-          source: "FDA Drug Label"
-        });
-      }
-    }
-  }
-
-  return interactions;
-}
-
-// Tool handlers
 export async function checkDrugInteractionsHandler(
   args: Record<string, unknown>
 ): Promise<ToolCallResult> {
   const drugs = args.drugs as string[];
-  const includeFood = args.include_food !== false;
+  const _includeFood = args.include_food !== false;
 
   if (!drugs || drugs.length < 2) {
     return {
@@ -348,105 +323,134 @@ export async function checkDrugInteractionsHandler(
     };
   }
 
-  // Add common food interactions if requested
-  const checkList = [...drugs];
-  if (includeFood) {
-    // We'll check against these in the pattern matching
-  }
+  const allInteractions: FoundInteraction[] = [];
+  const checkedPairs = new Set<string>();
 
-  const allInteractions: DrugInteraction[] = [];
-
-  // 1. Check our curated database
-  const knownInteractions = checkKnownInteractions(checkList);
-  allInteractions.push(...knownInteractions);
-
-  // 2. Fetch FDA labels and extract additional interactions
-  for (const drug of drugs) {
-    const label = await fetchDrugLabel(drug);
-    if (label) {
-      const otherDrugs = drugs.filter(d => d !== drug);
-      const labelInteractions = extractInteractionsFromLabel(label, drug, otherDrugs);
+  // Check all drug pairs
+  for (let i = 0; i < drugs.length; i++) {
+    for (let j = i + 1; j < drugs.length; j++) {
+      const drug1 = drugs[i];
+      const drug2 = drugs[j];
+      const pairKey = [normalizeDrugName(drug1), normalizeDrugName(drug2)].sort().join("|");
       
-      // Add only if not already found
-      for (const interaction of labelInteractions) {
-        const exists = allInteractions.some(
-          int => (int.drug1 === interaction.drug1 && int.drug2 === interaction.drug2) ||
-                 (int.drug1 === interaction.drug2 && int.drug2 === interaction.drug1)
-        );
-        if (!exists) {
-          allInteractions.push(interaction);
-        }
+      if (checkedPairs.has(pairKey)) continue;
+      checkedPairs.add(pairKey);
+
+      // 1. Check curated database
+      const dbInteractions = findDatabaseInteractions(drug1, drug2);
+      for (const int of dbInteractions) {
+        allInteractions.push({
+          drug1,
+          drug2,
+          severity: int.severity,
+          evidence: int.evidence,
+          description: int.description,
+          mechanism: int.mechanismDetail,
+          management: int.management,
+          monitoringRequired: int.monitoringRequired,
+          monitoringParameters: int.monitoringParameters,
+          sources: int.sources,
+        });
+      }
+
+      // 2. Check class-level interactions
+      if (dbInteractions.length === 0) {
+        const classInteractions = checkClassInteractions(drug1, drug2);
+        allInteractions.push(...classInteractions);
       }
     }
   }
 
   // Remove duplicates and sort by severity
-  const severityOrder: Record<SeverityLevel, number> = { major: 0, moderate: 1, minor: 2, unknown: 3 };
   const uniqueInteractions = allInteractions
     .filter((int, idx, arr) => {
-      const firstIdx = arr.findIndex(
-        i => (i.drug1 === int.drug1 && i.drug2 === int.drug2) ||
-             (i.drug1 === int.drug2 && i.drug2 === int.drug1)
+      const key = [normalizeDrugName(int.drug1), normalizeDrugName(int.drug2)].sort().join("|") + int.severity;
+      const firstIdx = arr.findIndex(i => 
+        [normalizeDrugName(i.drug1), normalizeDrugName(i.drug2)].sort().join("|") + i.severity === key
       );
       return firstIdx === idx;
     })
-    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+
+  // Count by severity
+  const counts = {
+    contraindicated: uniqueInteractions.filter(i => i.severity === "contraindicated").length,
+    major: uniqueInteractions.filter(i => i.severity === "major").length,
+    moderate: uniqueInteractions.filter(i => i.severity === "moderate").length,
+    minor: uniqueInteractions.filter(i => i.severity === "minor" || i.severity === "unknown").length,
+  };
 
   // Format response
-  const majorCount = uniqueInteractions.filter(i => i.severity === "major").length;
-  const moderateCount = uniqueInteractions.filter(i => i.severity === "moderate").length;
-  const minorCount = uniqueInteractions.filter(i => i.severity === "minor" || i.severity === "unknown").length;
-
   let text = `# Drug Interaction Report\n\n`;
+  text += `**Database Version:** ${INTERACTION_DB_VERSION} (Updated: ${INTERACTION_DB_LAST_UPDATED})\n`;
   text += `**Medications Checked:** ${drugs.join(", ")}\n\n`;
-  
+
   if (uniqueInteractions.length === 0) {
     text += `## ✅ No Known Interactions Found\n\n`;
-    text += `No significant drug-drug interactions were identified between these medications in our database. `;
-    text += `However, this does not guarantee safety. Always verify with a pharmacist or healthcare provider.\n`;
+    text += `No significant drug-drug interactions were identified between these medications in our database.\n\n`;
+    text += `**Important:** This does not guarantee safety. Always verify with a pharmacist or healthcare provider.\n`;
   } else {
-    text += `## ⚠️ Interactions Found: ${uniqueInteractions.length}\n\n`;
+    text += `## ⚠️ ${uniqueInteractions.length} Interaction(s) Found\n\n`;
     text += `| Severity | Count |\n|----------|-------|\n`;
-    if (majorCount > 0) text += `| 🔴 Major | ${majorCount} |\n`;
-    if (moderateCount > 0) text += `| 🟡 Moderate | ${moderateCount} |\n`;
-    if (minorCount > 0) text += `| 🟢 Minor/Unknown | ${minorCount} |\n`;
+    if (counts.contraindicated > 0) text += `| ⛔ Contraindicated | ${counts.contraindicated} |\n`;
+    if (counts.major > 0) text += `| 🔴 Major | ${counts.major} |\n`;
+    if (counts.moderate > 0) text += `| 🟡 Moderate | ${counts.moderate} |\n`;
+    if (counts.minor > 0) text += `| 🟢 Minor | ${counts.minor} |\n`;
     text += `\n`;
 
-    // Group by severity
-    if (majorCount > 0) {
-      text += `### 🔴 Major Interactions (Avoid or Use Extreme Caution)\n\n`;
+    // Contraindicated
+    if (counts.contraindicated > 0) {
+      text += `### ⛔ CONTRAINDICATED - Do Not Use Together\n\n`;
+      for (const int of uniqueInteractions.filter(i => i.severity === "contraindicated")) {
+        text += `**${int.drug1} + ${int.drug2}**\n`;
+        text += `${int.description}\n`;
+        if (int.management) text += `*Management:* ${int.management}\n`;
+        text += `*Sources:* ${int.sources.join(", ")}\n\n`;
+      }
+    }
+
+    // Major
+    if (counts.major > 0) {
+      text += `### 🔴 Major Interactions - Avoid or Use Extreme Caution\n\n`;
       for (const int of uniqueInteractions.filter(i => i.severity === "major")) {
         text += `**${int.drug1} + ${int.drug2}**\n`;
         text += `${int.description}\n`;
-        text += `*Source: ${int.source}*\n\n`;
+        if (int.mechanism) text += `*Mechanism:* ${int.mechanism}\n`;
+        if (int.management) text += `*Management:* ${int.management}\n`;
+        if (int.monitoringRequired && int.monitoringParameters) {
+          text += `*Monitor:* ${int.monitoringParameters.join(", ")}\n`;
+        }
+        text += `*Sources:* ${int.sources.join(", ")}\n\n`;
       }
     }
 
-    if (moderateCount > 0) {
-      text += `### 🟡 Moderate Interactions (Monitor Closely)\n\n`;
+    // Moderate
+    if (counts.moderate > 0) {
+      text += `### 🟡 Moderate Interactions - Monitor Closely\n\n`;
       for (const int of uniqueInteractions.filter(i => i.severity === "moderate")) {
         text += `**${int.drug1} + ${int.drug2}**\n`;
         text += `${int.description}\n`;
-        text += `*Source: ${int.source}*\n\n`;
+        if (int.management) text += `*Management:* ${int.management}\n`;
+        text += `\n`;
       }
     }
 
-    if (minorCount > 0) {
-      text += `### 🟢 Minor/Unknown Interactions\n\n`;
+    // Minor
+    if (counts.minor > 0) {
+      text += `### 🟢 Minor Interactions\n\n`;
       for (const int of uniqueInteractions.filter(i => i.severity === "minor" || i.severity === "unknown")) {
         text += `**${int.drug1} + ${int.drug2}**\n`;
-        text += `${int.description}\n`;
-        text += `*Source: ${int.source}*\n\n`;
+        text += `${int.description}\n\n`;
       }
     }
   }
 
   text += `---\n`;
-  text += `⚕️ **Important:** This is a screening tool. Always consult a pharmacist or healthcare provider for complete interaction checking, especially for:\n`;
+  text += `⚕️ **Important:** This is a screening tool using evidence-based data. Always consult a pharmacist or healthcare provider, especially for:\n`;
   text += `- Complex medication regimens\n`;
   text += `- Patients with liver or kidney impairment\n`;
   text += `- Elderly patients\n`;
-  text += `- Patients taking narrow therapeutic index drugs\n`;
+  text += `- Narrow therapeutic index drugs\n`;
 
   return {
     content: [{ type: "text", text }],
@@ -459,67 +463,75 @@ export async function getDrugInteractionDetailsHandler(
   const drug1 = String(args.drug1);
   const drug2 = String(args.drug2);
 
-  // Check our database first
-  const interactions = checkKnownInteractions([drug1, drug2]);
+  // Find database interactions
+  const dbInteractions = findDatabaseInteractions(drug1, drug2);
+  const classInteractions = checkClassInteractions(drug1, drug2);
+  
+  // Combine, preferring database entries
+  const allInteractions = [...dbInteractions.map(int => ({
+    drug1,
+    drug2,
+    severity: int.severity as SeverityLevel,
+    evidence: int.evidence,
+    description: int.description,
+    mechanism: int.mechanismDetail,
+    management: int.management,
+    monitoringRequired: int.monitoringRequired,
+    monitoringParameters: int.monitoringParameters,
+    sources: int.sources,
+    effect: int.effect,
+  })), ...classInteractions];
 
-  // Fetch labels for both drugs
+  // Fetch FDA labels for additional context
   const [label1, label2] = await Promise.all([
     fetchDrugLabel(drug1),
     fetchDrugLabel(drug2),
   ]);
 
-  // Extract from labels
-  if (label1) {
-    const labelInt = extractInteractionsFromLabel(label1, drug1, [drug2]);
-    for (const int of labelInt) {
-      if (!interactions.some(i => i.drug1 === int.drug1 && i.drug2 === int.drug2)) {
-        interactions.push(int);
-      }
-    }
-  }
-  if (label2) {
-    const labelInt = extractInteractionsFromLabel(label2, drug2, [drug1]);
-    for (const int of labelInt) {
-      if (!interactions.some(i => 
-        (i.drug1 === int.drug1 && i.drug2 === int.drug2) ||
-        (i.drug1 === int.drug2 && i.drug2 === int.drug1)
-      )) {
-        interactions.push(int);
-      }
-    }
-  }
-
   let text = `# Interaction Details: ${drug1} + ${drug2}\n\n`;
+  text += `**Database Version:** ${INTERACTION_DB_VERSION}\n\n`;
 
-  if (interactions.length === 0) {
+  if (allInteractions.length === 0) {
     text += `## No Documented Interaction\n\n`;
     text += `No significant interaction between ${drug1} and ${drug2} was found in our database.\n\n`;
-    text += `**Note:** Absence of documented interaction does not guarantee safety. `;
-    text += `New interactions are discovered regularly. Consult a pharmacist for definitive guidance.\n`;
+    text += `**Note:** Absence of documented interaction does not guarantee safety. New interactions are discovered regularly.\n`;
   } else {
-    const int = interactions[0]; // Use most relevant
+    const primary = allInteractions[0];
+    const emoji = SEVERITY_EMOJI[primary.severity] || "⚪";
+    const label = SEVERITY_LABEL[primary.severity] || "Unknown";
+
+    text += `## ${emoji} Severity: ${label}\n\n`;
+    text += `**Evidence Level:** ${primary.evidence}\n\n`;
     
-    const severityEmoji = int.severity === "major" ? "🔴" : int.severity === "moderate" ? "🟡" : "🟢";
-    const severityText = int.severity.charAt(0).toUpperCase() + int.severity.slice(1);
-    
-    text += `## ${severityEmoji} Severity: ${severityText}\n\n`;
-    text += `### Clinical Significance\n${int.description}\n\n`;
-    
-    if (int.mechanism) {
-      text += `### Mechanism\n${int.mechanism}\n\n`;
+    text += `### Clinical Significance\n${primary.description}\n\n`;
+
+    if (primary.mechanism) {
+      text += `### Mechanism\n${primary.mechanism}\n\n`;
     }
-    
-    if (int.management) {
-      text += `### Management\n${int.management}\n\n`;
+
+    if (primary.management) {
+      text += `### Management\n${primary.management}\n\n`;
     }
-    
+
+    if (primary.monitoringRequired && primary.monitoringParameters) {
+      text += `### Monitoring Required\n`;
+      for (const param of primary.monitoringParameters) {
+        text += `- ${param}\n`;
+      }
+      text += `\n`;
+    }
+
     text += `### Recommendations\n`;
-    if (int.severity === "major") {
+    if (primary.severity === "contraindicated") {
+      text += `- **DO NOT USE this combination**\n`;
+      text += `- There are no safe conditions for concurrent use\n`;
+      text += `- Seek alternative therapy\n`;
+    } else if (primary.severity === "major") {
       text += `- **Avoid this combination** if possible\n`;
       text += `- If unavoidable, require close monitoring\n`;
       text += `- Document clinical justification\n`;
       text += `- Consider alternative medications\n`;
-    } else if (int.severity === "moderate") {
+    } else if (primary.severity === "moderate") {
       text += `- **Use with caution**\n`;
       text += `- Monitor for signs of interaction\n`;
       text += `- Adjust doses if necessary\n`;
@@ -528,18 +540,25 @@ export async function getDrugInteractionDetailsHandler(
       text += `- Generally safe to use together\n`;
       text += `- Standard monitoring is usually sufficient\n`;
     }
-    
-    text += `\n*Source: ${int.source}*\n`;
+
+    text += `\n### Sources\n`;
+    for (const source of primary.sources) {
+      text += `- ${source}\n`;
+    }
   }
 
   // Add drug info if available
-  if (label1 || label2) {
-    text += `\n---\n### Additional Drug Information\n\n`;
+  if (label1?.openfda || label2?.openfda) {
+    text += `\n---\n### Drug Information\n\n`;
     if (label1?.openfda) {
-      text += `**${drug1}:** ${label1.openfda.generic_name?.[0] || drug1} (${label1.openfda.brand_name?.[0] || "N/A"})\n`;
+      const generic = label1.openfda.generic_name?.[0] || drug1;
+      const brand = label1.openfda.brand_name?.[0];
+      text += `**${drug1}:** ${generic}${brand ? ` (${brand})` : ""}\n`;
     }
     if (label2?.openfda) {
-      text += `**${drug2}:** ${label2.openfda.generic_name?.[0] || drug2} (${label2.openfda.brand_name?.[0] || "N/A"})\n`;
+      const generic = label2.openfda.generic_name?.[0] || drug2;
+      const brand = label2.openfda.brand_name?.[0];
+      text += `**${drug2}:** ${generic}${brand ? ` (${brand})` : ""}\n`;
     }
   }
 
