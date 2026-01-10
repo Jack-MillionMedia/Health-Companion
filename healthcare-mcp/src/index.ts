@@ -5,10 +5,14 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { handleMcpRequest, handleLegacyToolsList, handleLegacyToolCall } from "./mcp/handler.js";
+import { handleMcpRequest, handleLegacyToolsList, handleLegacyToolCall, getCacheStats } from "./mcp/handler.js";
 import { registerAllTools } from "./mcp/tools.js";
 import { HealthcareChat } from "./ai/chat.js";
 import { apiRateLimiter, chatRateLimiter, mcpRateLimiter } from "./middleware/rate-limit.js";
+import { disclaimerEnforcer, ensureDisclaimer } from "./middleware/disclaimer.js";
+import { logger, logEvents, httpLogger } from "./utils/logger.js";
+import { sessionManager, SessionConfig } from "./utils/session-manager.js";
+import { responseCache } from "./utils/cache.js";
 
 // Import tool handlers directly for AI integration
 import {
@@ -42,6 +46,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// Extend Express Request type
+declare global {
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
 // Tool executor for AI chat
 async function executeToolForAI(name: string, args: Record<string, unknown>): Promise<string> {
   const handlers: Record<string, (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>> = {
@@ -73,17 +86,13 @@ async function executeToolForAI(name: string, args: Record<string, unknown>): Pr
   return result.content[0]?.text || "No data returned";
 }
 
-// Session-based chat instances
-const chatSessions = new Map<string, HealthcareChat>();
-
-function getChatSession(sessionId: string): HealthcareChat | null {
-  if (!OPENAI_API_KEY) return null;
-  
-  if (!chatSessions.has(sessionId)) {
-    chatSessions.set(sessionId, new HealthcareChat(OPENAI_API_KEY, executeToolForAI));
+// Initialize session manager with chat factory
+sessionManager.setChatFactory((sessionId: string) => {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OpenAI API key not configured");
   }
-  return chatSessions.get(sessionId)!;
-}
+  return new HealthcareChat(OPENAI_API_KEY, executeToolForAI);
+});
 
 // Middleware
 app.use(express.json({ limit: "100kb" })); // Limit request body size
@@ -92,43 +101,47 @@ app.use(express.static(path.join(__dirname, "web")));
 // Apply rate limiting globally first, then specific limiters per route
 app.use(apiRateLimiter);
 
-// Request logging with timing
+// Request ID and structured logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
-  const requestId = Math.random().toString(36).substring(7);
-  
-  // Log request
-  console.log(JSON.stringify({
-    type: "request",
-    id: requestId,
-    timestamp: new Date().toISOString(),
-    method: req.method,
-    path: req.path,
-    ip: req.ip,
-  }));
+  const requestId = Math.random().toString(36).substring(2, 10);
+  req.requestId = requestId;
+
+  // Log incoming request
+  logEvents.httpRequest(requestId, req.method, req.path, req.ip || "unknown");
 
   // Log response on finish
   res.on("finish", () => {
-    console.log(JSON.stringify({
-      type: "response",
-      id: requestId,
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      path: req.path,
-      status: res.statusCode,
-      duration_ms: Date.now() - start,
-    }));
+    const durationMs = Date.now() - start;
+    logEvents.httpResponse(requestId, req.method, req.path, res.statusCode, durationMs);
   });
 
   next();
 });
 
-// Health check
+// Health check (with detailed stats)
 app.get("/health", (_req, res) => {
-  res.json({ 
-    status: "ok", 
+  res.json({
+    status: "ok",
     service: "Healthcare API MCP",
-    ai_enabled: !!OPENAI_API_KEY
+    ai_enabled: !!OPENAI_API_KEY,
+  });
+});
+
+// Detailed stats endpoint for monitoring
+app.get("/stats", (_req, res) => {
+  const cacheStats = getCacheStats();
+  const sessionStats = sessionManager.getStats();
+  const disclaimerStats = disclaimerEnforcer.getStats();
+
+  res.json({
+    cache: cacheStats,
+    sessions: sessionStats,
+    disclaimer: disclaimerStats,
+    config: {
+      sessionTtlMs: SessionConfig.TTL_MS,
+      maxSessions: SessionConfig.MAX_SESSIONS,
+    },
   });
 });
 
@@ -155,43 +168,57 @@ app.get("/api/info", (_req, res) => {
 // AI Chat endpoint (with stricter rate limiting)
 app.post("/api/chat", chatRateLimiter, async (req, res) => {
   if (!OPENAI_API_KEY) {
-    res.status(503).json({ 
-      error: "AI chat not configured. Set OPENAI_API_KEY environment variable." 
+    res.status(503).json({
+      error: "AI chat not configured. Set OPENAI_API_KEY environment variable.",
     });
     return;
   }
 
   const { message, sessionId = "default" } = req.body;
+  const requestId = req.requestId || "unknown";
 
   if (!message || typeof message !== "string") {
     res.status(400).json({ error: "Message is required" });
     return;
   }
 
+  if (message.length > 10000) {
+    res.status(400).json({ error: "Message too long (max 10000 characters)" });
+    return;
+  }
+
   try {
-    const chat = getChatSession(sessionId);
+    const chat = sessionManager.getSession(sessionId);
     if (!chat) {
       res.status(503).json({ error: "Chat service unavailable" });
       return;
     }
 
-    console.log(`💬 User: ${message.substring(0, 100)}...`);
-    const response = await chat.chat(message);
-    console.log(`🤖 Assistant: ${response.substring(0, 100)}...`);
+    logEvents.aiRequest(sessionId, message.length);
+    const startTime = Date.now();
+
+    let response = await chat.chat(message);
+    sessionManager.recordMessage(sessionId);
+
+    // ENFORCE DISCLAIMER - this is critical for medical safety
+    response = ensureDisclaimer(response);
+    disclaimerEnforcer.enforce(response); // Track stats
+
+    const durationMs = Date.now() - startTime;
+    logEvents.aiResponse(sessionId, response.length, durationMs);
 
     res.json({ response, sessionId });
   } catch (error) {
-    console.error("Chat error:", error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : "Chat failed" 
-    });
+    const errorMessage = error instanceof Error ? error.message : "Chat failed";
+    logEvents.aiError(sessionId, errorMessage);
+    res.status(500).json({ error: errorMessage });
   }
 });
 
 // Clear chat history
 app.post("/api/chat/clear", (req, res) => {
   const { sessionId = "default" } = req.body;
-  chatSessions.delete(sessionId);
+  sessionManager.deleteSession(sessionId);
   res.json({ success: true });
 });
 
@@ -226,8 +253,11 @@ app.get("/mcp/tools", handleLegacyToolsList);
 app.post("/mcp/call", mcpRateLimiter, handleLegacyToolCall);
 
 // Error handler
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("Server error:", err);
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  httpLogger.error(
+    { requestId: req.requestId, error: err.message, stack: err.stack },
+    "unhandled error"
+  );
   res.status(500).json({
     jsonrpc: "2.0",
     id: null,
@@ -238,38 +268,48 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
+// Graceful shutdown
+function shutdown() {
+  logger.info("shutting down gracefully...");
+  sessionManager.stop();
+  responseCache.stop();
+  process.exit(0);
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+
 // Initialize and start server
 function main(): void {
-  console.log("\n╔════════════════════════════════════════╗");
-  console.log("║   🏥 Healthcare AI Assistant           ║");
-  console.log("╚════════════════════════════════════════╝\n");
+  // ASCII banner (compact)
+  logger.info("═══════════════════════════════════════");
+  logger.info("   🏥 Healthcare AI Assistant v1.0.0   ");
+  logger.info("═══════════════════════════════════════");
 
   // Register all tools
   registerAllTools();
 
-  console.log("");
+  const toolCount = 13;
 
-  // Check for OpenAI API key
-  if (OPENAI_API_KEY) {
-    console.log("✓ AI Chat enabled (GPT-5-nano)");
-  } else {
-    console.log("⚠ AI Chat disabled - set OPENAI_API_KEY to enable");
+  // Log startup info
+  logEvents.serverStart(Number(PORT), !!OPENAI_API_KEY, toolCount);
+
+  if (!OPENAI_API_KEY) {
+    logger.warn("AI Chat disabled - set OPENAI_API_KEY to enable");
   }
-
-  console.log("");
 
   // Start server
   app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log("\nEndpoints:");
+    logger.info({ port: PORT }, "server listening");
+    logger.info("endpoints available:");
     if (OPENAI_API_KEY) {
-      console.log(`  🌐 http://localhost:${PORT}/           - AI Chat Interface`);
-      console.log(`  💬 http://localhost:${PORT}/api/chat   - Chat API`);
+      logger.info(`  🌐 http://localhost:${PORT}/           - AI Chat Interface`);
+      logger.info(`  💬 http://localhost:${PORT}/api/chat   - Chat API`);
     }
-    console.log(`  📋 http://localhost:${PORT}/mcp/tools  - List tools`);
-    console.log(`  🔧 http://localhost:${PORT}/mcp/call   - Call tool`);
-    console.log(`  🔌 http://localhost:${PORT}/mcp        - MCP endpoint`);
-    console.log("\n");
+    logger.info(`  📋 http://localhost:${PORT}/mcp/tools  - List tools`);
+    logger.info(`  🔧 http://localhost:${PORT}/mcp/call   - Call tool`);
+    logger.info(`  📊 http://localhost:${PORT}/stats      - Server stats`);
+    logger.info(`  🔌 http://localhost:${PORT}/mcp        - MCP endpoint`);
   });
 }
 

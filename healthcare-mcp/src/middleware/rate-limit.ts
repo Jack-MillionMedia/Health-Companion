@@ -1,6 +1,7 @@
 // Rate limiting middleware for API protection
 import rateLimit from "express-rate-limit";
 import type { Request, Response } from "express";
+import { logEvents } from "../utils/logger.js";
 
 // Configuration constants
 const WINDOW_MS = 60 * 1000; // 1 minute
@@ -24,7 +25,7 @@ export const apiRateLimiter = rateLimit({
     return req.path === "/health";
   },
   handler: (req: Request, res: Response): void => {
-    console.warn(`Rate limit exceeded for IP: ${req.ip}, path: ${req.path}`);
+    logEvents.rateLimitHit(req.ip || "unknown", req.path);
     res.status(429).json({
       error: "Too many requests",
       message: `Rate limit exceeded. Maximum ${MAX_REQUESTS_PER_WINDOW} requests per minute.`,
@@ -45,7 +46,7 @@ export const chatRateLimiter = rateLimit({
     retryAfter: Math.ceil(WINDOW_MS / 1000),
   },
   handler: (req: Request, res: Response): void => {
-    console.warn(`Chat rate limit exceeded for IP: ${req.ip}`);
+    logEvents.rateLimitHit(req.ip || "unknown", "/api/chat");
     res.status(429).json({
       error: "Too many chat requests",
       message: `Chat rate limit exceeded. Maximum ${MAX_CHAT_REQUESTS_PER_WINDOW} requests per minute.`,
@@ -61,7 +62,7 @@ export const mcpRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response): void => {
-    console.warn(`MCP rate limit exceeded for IP: ${req.ip}`);
+    logEvents.rateLimitHit(req.ip || "unknown", "/mcp");
     res.status(429).json({
       jsonrpc: "2.0",
       id: null,

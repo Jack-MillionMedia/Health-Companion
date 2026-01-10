@@ -1,5 +1,6 @@
 // Tool registration - connects all providers to MCP handler
 import { registerTool } from "./handler.js";
+import { toolLogger } from "../utils/logger.js";
 
 // OpenFDA tools
 import {
@@ -71,13 +72,9 @@ export function registerAllTools(): void {
   registerTool(medicareDrugPricingTool, medicareDrugPricingHandler);
   registerTool(procedurePricingTool, procedurePricingHandler);
 
-  console.log("✓ Registered 13 healthcare tools:");
-  console.log("  📦 OpenFDA:");
-  console.log("     - drug_lookup, adverse_events, drug_recalls, drug_labels");
-  console.log("  💊 Drug Interactions:");
-  console.log("     - check_drug_interactions, get_drug_interaction_details");
-  console.log("  🔬 Clinical Trials:");
-  console.log("     - search_clinical_trials, get_clinical_trial_details, get_trial_results_summary");
-  console.log("  📋 Guidelines & Pricing:");
-  console.log("     - search_guidelines, guideline_summary, medicare_drug_pricing, procedure_pricing");
+  toolLogger.info({ count: 13 }, "registered healthcare tools");
+  toolLogger.info("  📦 OpenFDA: drug_lookup, adverse_events, drug_recalls, drug_labels");
+  toolLogger.info("  💊 Drug Interactions: check_drug_interactions, get_drug_interaction_details");
+  toolLogger.info("  🔬 Clinical Trials: search_clinical_trials, get_clinical_trial_details, get_trial_results_summary");
+  toolLogger.info("  📋 Guidelines & Pricing: search_guidelines, guideline_summary, medicare_drug_pricing, procedure_pricing");
 }
