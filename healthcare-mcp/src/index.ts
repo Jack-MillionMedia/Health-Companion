@@ -120,11 +120,34 @@ app.use((req, res, next) => {
 });
 
 // Health check (with detailed stats)
-app.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
+app.get("/health", async (_req, res) => {
+  const checks: Record<string, { status: "ok" | "degraded" | "down"; latency_ms?: number }> = {};
+  
+  // Check OpenFDA (quick HEAD request)
+  const fdaStart = Date.now();
+  try {
+    const resp = await fetch("https://api.fda.gov/drug/label.json?limit=1", { 
+      method: "GET",
+      signal: AbortSignal.timeout(3000)
+    });
+    checks.openfda = { status: resp.ok ? "ok" : "degraded", latency_ms: Date.now() - fdaStart };
+  } catch {
+    checks.openfda = { status: "down", latency_ms: Date.now() - fdaStart };
+  }
+
+  // Check OpenAI configured
+  checks.openai = { status: OPENAI_API_KEY ? "ok" : "degraded" };
+
+  // Overall status
+  const allOk = Object.values(checks).every(c => c.status === "ok");
+  const anyDown = Object.values(checks).some(c => c.status === "down");
+
+  res.status(anyDown ? 503 : 200).json({
+    status: anyDown ? "unhealthy" : allOk ? "healthy" : "degraded",
     service: "Healthcare API MCP",
-    ai_enabled: !!OPENAI_API_KEY,
+    version: "1.0.0",
+    uptime_seconds: Math.floor(process.uptime()),
+    checks,
   });
 });
 

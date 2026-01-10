@@ -203,10 +203,36 @@ curl -X POST http://localhost:3000/mcp/call \
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | - | **Required for AI chat.** Get from [OpenAI](https://platform.openai.com/api-keys) |
-| `PORT` | 3000 | Server port |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | For chat | - | OpenAI API key. Tools work without it, chat requires it. |
+| `PORT` | No | 3000 | Server port |
+| `NODE_ENV` | No | development | Set to `production` for JSON logs |
+
+## Docker
+
+```bash
+# Build
+docker build -t healthcare-mcp .
+
+# Run
+docker run -d --name healthcare-mcp \
+  -p 3000:3000 \
+  -e OPENAI_API_KEY=sk-your-key \
+  healthcare-mcp
+
+# Check health
+curl localhost:3000/health
+```
+
+## Monitoring
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check with dependency status |
+| `GET /stats` | Cache, session, and rate limit metrics |
+
+See [RUNBOOK.md](RUNBOOK.md) for operations guide.
 
 ## Example Questions
 
