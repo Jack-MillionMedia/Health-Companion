@@ -849,12 +849,12 @@ export const DRUG_INTERACTIONS: DrugInteractionEntry[] = [
     evidence: "established",
     mechanism: "pharmacodynamic",
     effect: "nephrotoxicity",
-    description: "Triple combination of ACE/ARB + diuretic + NSAID ('triple whammy') dramatically increases risk of acute kidney injury.",
-    mechanismDetail: "NSAIDs constrict afferent arteriole, ACE/ARBs dilate efferent arteriole, diuretics reduce volume - together cause severe GFR drop.",
-    management: "Avoid triple combination. If NSAID needed, use lowest dose, shortest duration, hold during volume depletion, monitor creatinine.",
+    description: "NSAIDs with ACE inhibitors increase risk of acute kidney injury. Risk is even higher if a diuretic is also present ('triple whammy').",
+    mechanismDetail: "NSAIDs constrict afferent arteriole, ACE inhibitors dilate efferent arteriole - together they reduce glomerular filtration. Diuretics amplify this by reducing volume.",
+    management: "Avoid if possible. If NSAID needed, use lowest dose for shortest duration. Monitor renal function. Extra caution if patient also on diuretics.",
     monitoringRequired: true,
-    monitoringParameters: ["Creatinine", "Urine output", "Blood pressure"],
-    sources: ["Lapi F et al. BMJ 2013"],
+    monitoringParameters: ["Creatinine", "eGFR", "Blood pressure"],
+    sources: ["Lapi F et al. BMJ 2013", "White WB et al. Hypertension 2007"],
   },
   
   // ===========================================================================
@@ -1075,23 +1075,7 @@ export const DRUG_INTERACTIONS: DrugInteractionEntry[] = [
   // MODERATE INTERACTIONS
   // ===========================================================================
   
-  // 46. ACE Inhibitors + NSAIDs (without diuretic)
-  {
-    drug: "ace_inhibitor",
-    interactsWith: "nsaid",
-    severity: "moderate",
-    evidence: "established",
-    mechanism: "pharmacodynamic",
-    effect: "decreased_efficacy",
-    description: "NSAIDs reduce antihypertensive effect of ACE inhibitors and increase risk of acute kidney injury.",
-    mechanismDetail: "NSAIDs inhibit prostaglandin-mediated renal blood flow and sodium excretion, opposing ACE inhibitor effects.",
-    management: "Use NSAIDs sparingly. Monitor blood pressure and renal function. Consider acetaminophen for pain.",
-    monitoringRequired: true,
-    monitoringParameters: ["Blood pressure", "Creatinine"],
-    sources: ["White WB et al. Hypertension 2007"],
-  },
-  
-  // 47. Beta Blockers + Non-DHP Calcium Channel Blockers
+  // 46. Beta Blockers + Non-DHP Calcium Channel Blockers
   {
     drug: "beta_blocker",
     interactsWith: "verapamil",
