@@ -275,6 +275,7 @@ export class HealthcareChat {
   private static readonly MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
   // Max tokens - configurable via env var
   private static readonly MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS) || 8192;
+  private static readonly TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE) || 0.2;
   private static readonly MAX_TOOL_ROUNDS = 5; // Prevent infinite loops
   private static readonly FINAL_SYSTEM_PROMPT =
     "Provide a complete, user-facing response now. Do not call tools. Follow the system rules and include citations if available.";
@@ -370,6 +371,7 @@ export class HealthcareChat {
       tools: HEALTHCARE_TOOLS,
       tool_choice: "auto" as const,
       max_completion_tokens: HealthcareChat.MAX_TOKENS,
+      temperature: HealthcareChat.TEMPERATURE,
     };
   }
 
@@ -385,6 +387,7 @@ export class HealthcareChat {
         messages: [...this.conversationHistory, { role: "system", content: HealthcareChat.FINAL_SYSTEM_PROMPT }],
         tool_choice: "none",
         max_completion_tokens: HealthcareChat.MAX_TOKENS,
+        temperature: HealthcareChat.TEMPERATURE,
       });
 
       return this.getMessageContent(response) || HealthcareChat.FALLBACK_MESSAGE;
@@ -553,6 +556,7 @@ export class HealthcareChat {
         messages: this.conversationHistory,
         stream: true,
         max_completion_tokens: HealthcareChat.MAX_TOKENS,
+        temperature: HealthcareChat.TEMPERATURE,
       });
 
       let fullResponse = "";
