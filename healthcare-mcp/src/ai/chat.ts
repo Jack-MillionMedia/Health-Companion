@@ -275,7 +275,12 @@ export class HealthcareChat {
   private static readonly MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
   // Max tokens - configurable via env var
   private static readonly MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS) || 8192;
+  private static readonly TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE) || 0.2;
   private static readonly MAX_TOOL_ROUNDS = 5; // Prevent infinite loops
+  private static readonly FINAL_SYSTEM_PROMPT =
+    "Provide a complete, user-facing response now. Do not call tools. Follow the system rules and include citations if available.";
+  private static readonly FALLBACK_MESSAGE =
+    "I couldn't generate a complete response. Please try rephrasing your question or try again in a moment.";
 
   constructor(apiKey: string, toolExecutor: ToolExecutor) {
     this.openai = new OpenAI({ apiKey });
@@ -359,6 +364,39 @@ export class HealthcareChat {
     return false;
   }
 
+  private buildChatRequest(messages: ChatCompletionMessageParam[]) {
+    return {
+      model: HealthcareChat.MODEL,
+      messages,
+      tools: HEALTHCARE_TOOLS,
+      tool_choice: "auto" as const,
+      max_completion_tokens: HealthcareChat.MAX_TOKENS,
+      temperature: HealthcareChat.TEMPERATURE,
+    };
+  }
+
+  private getMessageContent(response: { choices?: Array<{ message?: { content?: string | null } }> }): string | null {
+    const message = response.choices?.[0]?.message;
+    return message?.content ?? null;
+  }
+
+  private async forceFinalResponse(): Promise<string> {
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: HealthcareChat.MODEL,
+        messages: [...this.conversationHistory, { role: "system", content: HealthcareChat.FINAL_SYSTEM_PROMPT }],
+        tool_choice: "none",
+        max_completion_tokens: HealthcareChat.MAX_TOKENS,
+        temperature: HealthcareChat.TEMPERATURE,
+      });
+
+      return this.getMessageContent(response) || HealthcareChat.FALLBACK_MESSAGE;
+    } catch (error) {
+      console.error("Final response fallback failed:", error);
+      return HealthcareChat.FALLBACK_MESSAGE;
+    }
+  }
+
   /**
    * Standard chat method with parallel tool execution, retry logic, and semantic caching
    */
@@ -383,15 +421,18 @@ export class HealthcareChat {
           await this.sleep(HealthcareChat.RETRY_DELAY_MS * attempt);
         }
 
-        let response = await this.openai.chat.completions.create({
-          model: HealthcareChat.MODEL,
-          messages: this.conversationHistory,
-          tools: HEALTHCARE_TOOLS,
-          tool_choice: "auto",
-          max_completion_tokens: HealthcareChat.MAX_TOKENS,
-        });
+        let response = await this.openai.chat.completions.create(
+          this.buildChatRequest(this.conversationHistory)
+        );
 
-        let message = response.choices[0].message;
+        let message = response.choices[0]?.message;
+        if (!message) {
+          console.warn("⚠️ Missing response message; forcing final response.");
+          const forced = await this.forceFinalResponse();
+          this.conversationHistory.push({ role: "assistant", content: forced });
+          queryCache.set(userMessage, forced);
+          return forced;
+        }
         let toolRounds = 0;
 
         // Handle tool calls with parallel execution
@@ -410,13 +451,9 @@ export class HealthcareChat {
           this.conversationHistory.push(...toolResults);
 
           // Get next response
-          response = await this.openai.chat.completions.create({
-            model: HealthcareChat.MODEL,
-            messages: this.conversationHistory,
-            tools: HEALTHCARE_TOOLS,
-            tool_choice: "auto",
-            max_completion_tokens: HealthcareChat.MAX_TOKENS,
-          });
+          response = await this.openai.chat.completions.create(
+            this.buildChatRequest(this.conversationHistory)
+          );
 
           message = response.choices[0].message;
         }
@@ -432,12 +469,12 @@ export class HealthcareChat {
         }
 
         // Handle empty response more gracefully
-        if (!message.content) {
-          console.warn("⚠️ Empty response from model, finish_reason:", choice.finish_reason);
+        if (!message.content || toolRounds >= HealthcareChat.MAX_TOOL_ROUNDS) {
+          console.warn("⚠️ Empty response or tool loop limit reached; forcing final response.");
         }
 
         let assistantResponse = message.content ||
-          "I couldn't generate a complete response. Please try rephrasing your question or try again in a moment.";
+          await this.forceFinalResponse();
 
         // Enforce disclaimer on substantive responses
         const DISCLAIMER = "\n\n⚕️ **Disclaimer**: Educational purposes only. Always consult a healthcare professional.";
@@ -477,15 +514,17 @@ export class HealthcareChat {
     this.conversationHistory.push({ role: "user", content: userMessage });
 
     try {
-      let response = await this.openai.chat.completions.create({
-        model: HealthcareChat.MODEL,
-        messages: this.conversationHistory,
-        tools: HEALTHCARE_TOOLS,
-        tool_choice: "auto",
-        max_completion_tokens: HealthcareChat.MAX_TOKENS,
-      });
+      let response = await this.openai.chat.completions.create(
+        this.buildChatRequest(this.conversationHistory)
+      );
 
-      let message = response.choices[0].message;
+      let message = response.choices[0]?.message;
+      if (!message) {
+        const forced = await this.forceFinalResponse();
+        yield forced;
+        this.conversationHistory.push({ role: "assistant", content: forced });
+        return;
+      }
       let toolRounds = 0;
 
       // Handle tool calls first (non-streaming phase)
@@ -504,13 +543,9 @@ export class HealthcareChat {
 
         this.conversationHistory.push(...toolResults);
 
-        response = await this.openai.chat.completions.create({
-          model: HealthcareChat.MODEL,
-          messages: this.conversationHistory,
-          tools: HEALTHCARE_TOOLS,
-          tool_choice: "auto",
-          max_completion_tokens: HealthcareChat.MAX_TOKENS,
-        });
+        response = await this.openai.chat.completions.create(
+          this.buildChatRequest(this.conversationHistory)
+        );
 
         message = response.choices[0].message;
       }
@@ -521,6 +556,7 @@ export class HealthcareChat {
         messages: this.conversationHistory,
         stream: true,
         max_completion_tokens: HealthcareChat.MAX_TOKENS,
+        temperature: HealthcareChat.TEMPERATURE,
       });
 
       let fullResponse = "";
@@ -533,10 +569,16 @@ export class HealthcareChat {
         }
       }
 
+      let finalResponse = fullResponse;
+      if (!finalResponse) {
+        finalResponse = await this.forceFinalResponse();
+        yield finalResponse;
+      }
+
       // Save complete response to history
       this.conversationHistory.push({
         role: "assistant",
-        content: fullResponse || "I apologize, but I couldn't generate a response."
+        content: finalResponse || "I apologize, but I couldn't generate a response."
       });
 
     } catch (error) {
