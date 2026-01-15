@@ -1,6 +1,6 @@
 // AI Chat Integration with OpenAI GPT-5 Nano
 // Optimized for low latency with parallel tool execution, streaming, and semantic caching
-import OpenAI from "openai";
+import { OpenAI } from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionTool, ChatCompletionChunk } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import { queryCache } from "../utils/query-cache.js";
