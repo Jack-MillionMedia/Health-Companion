@@ -317,6 +317,29 @@ export const THYROID_DRUGS = [
   "liothyronine", "cytomel",
 ] as const;
 
+/** Acetaminophen / Paracetamol */
+export const ACETAMINOPHEN_DRUGS = [
+  "acetaminophen", "tylenol", "paracetamol", "panadol",
+  "mapap", "ofirmev", "percocet", "vicodin", "norco", // combination products
+] as const;
+
+/** Corticosteroids */
+export const CORTICOSTEROID_DRUGS = [
+  "prednisone", "prednisolone", "deltasone",
+  "methylprednisolone", "medrol", "solu-medrol",
+  "dexamethasone", "decadron",
+  "hydrocortisone", "cortef",
+  "budesonide", "entocort",
+  "triamcinolone", "kenalog",
+  "betamethasone", "celestone",
+] as const;
+
+/** Gabapentinoids */
+export const GABAPENTINOID_DRUGS = [
+  "gabapentin", "neurontin", "gralise",
+  "pregabalin", "lyrica",
+] as const;
+
 // ============================================================================
 // INTERACTION DATABASE
 // ============================================================================
@@ -1301,6 +1324,177 @@ export const DRUG_INTERACTIONS: DrugInteractionEntry[] = [
     monitoringParameters: ["Signs of bleeding", "Hemoglobin"],
     sources: ["Davidson BL et al. Lancet 2014", "RE-LY Trial"],
   },
+  
+  // ===========================================================================
+  // ACETAMINOPHEN INTERACTIONS
+  // ===========================================================================
+  
+  // 61. Aspirin + Acetaminophen
+  {
+    drug: "aspirin",
+    interactsWith: "acetaminophen",
+    severity: "moderate",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "increased_toxicity",
+    description: "Taking aspirin with acetaminophen increases risk of GI bleeding and may cause additive effects. Aspirin's blood-thinning effect combined with both drugs' potential for GI irritation requires caution.",
+    mechanismDetail: "Aspirin irreversibly inhibits COX-1 (antiplatelet effect) and can irritate GI mucosa. Acetaminophen, while not an NSAID, can have additive analgesic effects leading to overuse. High-dose acetaminophen also stresses liver function.",
+    management: "Occasional short-term use is generally safe. Avoid chronic combined use. Do not exceed recommended doses. Use the lowest effective dose for shortest duration. Consider separating doses by 4-6 hours.",
+    monitoringRequired: true,
+    monitoringParameters: ["GI symptoms", "Signs of bleeding", "Liver function with chronic use"],
+    sources: ["WebMD Drug Interaction Checker", "FDA OTC Pain Reliever Guidelines", "American Geriatrics Society"],
+  },
+  
+  // 62. NSAIDs + Acetaminophen (general)
+  {
+    drug: "nsaid",
+    interactsWith: "acetaminophen",
+    severity: "moderate",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "increased_toxicity",
+    description: "Combining NSAIDs with acetaminophen requires caution. While they work via different mechanisms and can be used together short-term, chronic combined use increases risk of GI bleeding and renal/hepatic injury.",
+    mechanismDetail: "NSAIDs inhibit COX enzymes causing GI mucosal damage and renal effects. Acetaminophen is hepatotoxic at high doses. Combined analgesic use may lead to exceeding safe dose limits.",
+    management: "Short-term alternating use is acceptable. Avoid chronic combined use. Do not exceed maximum daily doses of either drug. Patients with liver disease, kidney disease, or GI problems should consult healthcare provider.",
+    monitoringRequired: true,
+    monitoringParameters: ["GI symptoms", "Liver function", "Kidney function"],
+    sources: ["WebMD Drug Interaction Checker", "FDA Guidelines", "Clinical Pharmacology"],
+  },
+  
+  // 63. Warfarin + Acetaminophen
+  {
+    drug: "warfarin",
+    interactsWith: "acetaminophen",
+    severity: "moderate",
+    evidence: "established",
+    mechanism: "pharmacokinetic",
+    effect: "increased_bleeding",
+    description: "Regular acetaminophen use (>2g/day for >1 week) can increase INR and bleeding risk in patients on warfarin.",
+    mechanismDetail: "Acetaminophen's metabolite NAPQI may inhibit vitamin K-dependent clotting factor synthesis. Effect is dose-dependent and cumulative.",
+    management: "Occasional low-dose acetaminophen is generally safe. Monitor INR if using >2g/day for more than a few days. Preferred over NSAIDs for pain in warfarin patients.",
+    monitoringRequired: true,
+    monitoringParameters: ["INR with chronic use"],
+    sources: ["Hylek EM et al. JAMA 1998", "Clinical Guidelines"],
+  },
+  
+  // 64. Alcohol + Acetaminophen
+  {
+    drug: "alcohol",
+    interactsWith: "acetaminophen",
+    severity: "major",
+    evidence: "established",
+    mechanism: "pharmacokinetic",
+    effect: "hepatotoxicity",
+    description: "Chronic alcohol use with acetaminophen significantly increases risk of severe liver damage (hepatotoxicity), even at therapeutic acetaminophen doses.",
+    mechanismDetail: "Alcohol induces CYP2E1 which increases production of NAPQI (hepatotoxic acetaminophen metabolite) while depleting glutathione stores needed to detoxify NAPQI.",
+    management: "Patients who drink ≥3 alcoholic beverages daily should avoid acetaminophen or use maximum 2g/day. Consider alternative pain relievers. Never take acetaminophen for hangover.",
+    monitoringRequired: true,
+    monitoringParameters: ["Liver function tests", "Signs of hepatotoxicity"],
+    sources: ["FDA Black Box Warning", "Zimmerman HJ et al. Hepatology 1995"],
+  },
+  
+  // ===========================================================================
+  // CORTICOSTEROID INTERACTIONS
+  // ===========================================================================
+  
+  // 65. Corticosteroids + NSAIDs
+  {
+    drug: "corticosteroid",
+    interactsWith: "nsaid",
+    severity: "major",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "increased_bleeding",
+    description: "Concurrent use of corticosteroids and NSAIDs significantly increases risk of GI bleeding and peptic ulcers. Risk is 4-15 times higher than with either drug alone.",
+    mechanismDetail: "Corticosteroids impair gastric mucosal defense by reducing prostaglandins and mucus production. NSAIDs inhibit COX-1, further reducing protective prostaglandins. Combined effect damages GI mucosa.",
+    management: "Avoid combination if possible. If necessary, use lowest effective doses for shortest duration. Add PPI prophylaxis. Monitor for GI symptoms. Consider topical or inhaled corticosteroids.",
+    monitoringRequired: true,
+    monitoringParameters: ["GI symptoms", "Stool for occult blood", "Hemoglobin"],
+    sources: ["Piper JM et al. Ann Intern Med 1991", "FDA Guidelines", "ACG Clinical Guidelines"],
+  },
+  
+  // 66. Corticosteroids + Anticoagulants
+  {
+    drug: "corticosteroid",
+    interactsWith: "warfarin",
+    severity: "moderate",
+    evidence: "established",
+    mechanism: "both",
+    effect: "increased_bleeding",
+    description: "Corticosteroids may increase warfarin effect and INR through unknown mechanisms. Also increase GI bleeding risk independent of INR.",
+    mechanismDetail: "Mechanism unclear but may involve altered warfarin metabolism or vitamin K-dependent clotting factor synthesis. GI mucosa effects add to bleeding risk.",
+    management: "Monitor INR more frequently when starting or stopping corticosteroids. Watch for signs of bleeding.",
+    monitoringRequired: true,
+    monitoringParameters: ["INR", "Signs of bleeding"],
+    sources: ["Clinical Guidelines"],
+  },
+  
+  // 67. Corticosteroids + Diabetes medications
+  {
+    drug: "corticosteroid",
+    interactsWith: "metformin",
+    severity: "moderate",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "decreased_efficacy",
+    description: "Corticosteroids cause hyperglycemia by increasing gluconeogenesis and insulin resistance. May require adjustment of diabetes medications.",
+    mechanismDetail: "Corticosteroids stimulate hepatic gluconeogenesis, reduce glucose uptake in peripheral tissues, and cause insulin resistance.",
+    management: "Monitor blood glucose closely when starting or adjusting corticosteroids. May need to increase diabetes medication doses. Effect is dose-dependent.",
+    monitoringRequired: true,
+    monitoringParameters: ["Blood glucose", "HbA1c"],
+    sources: ["Clinical Guidelines", "American Diabetes Association"],
+  },
+  
+  // ===========================================================================
+  // GABAPENTINOID INTERACTIONS
+  // ===========================================================================
+  
+  // 68. Gabapentinoids + Opioids
+  {
+    drug: "gabapentinoid",
+    interactsWith: "opioid",
+    severity: "major",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "respiratory_depression",
+    description: "FDA WARNING: Concurrent use of gabapentinoids (gabapentin, pregabalin) with opioids increases risk of respiratory depression, sedation, and death.",
+    mechanismDetail: "Both drug classes cause CNS depression. Gabapentinoids enhance opioid-induced respiratory depression through additive effects on brainstem respiratory centers.",
+    management: "Avoid combination if possible. If necessary, use lowest effective doses. Monitor for signs of respiratory depression. Prescribe naloxone. Counsel patients about risks.",
+    monitoringRequired: true,
+    monitoringParameters: ["Respiratory rate", "Level of sedation", "Oxygen saturation"],
+    sources: ["FDA Drug Safety Communication 2019", "Gomes T et al. PLoS Med 2017"],
+  },
+  
+  // 69. Gabapentinoids + Benzodiazepines
+  {
+    drug: "gabapentinoid",
+    interactsWith: "benzodiazepine",
+    severity: "major",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "respiratory_depression",
+    description: "Combined use increases risk of CNS depression, respiratory depression, and overdose death.",
+    mechanismDetail: "Additive CNS depressant effects through different mechanisms: GABA-A enhancement (benzodiazepines) and calcium channel modulation (gabapentinoids).",
+    management: "Avoid if possible. If necessary, use lowest doses and monitor closely.",
+    monitoringRequired: true,
+    monitoringParameters: ["Respiratory rate", "Level of sedation"],
+    sources: ["FDA Drug Safety Communication", "Clinical Guidelines"],
+  },
+  
+  // 70. Gabapentinoids + Alcohol
+  {
+    drug: "gabapentinoid",
+    interactsWith: "alcohol",
+    severity: "major",
+    evidence: "established",
+    mechanism: "pharmacodynamic",
+    effect: "cns_depression",
+    description: "Alcohol enhances CNS depressant effects of gabapentinoids, increasing sedation and potentially respiratory depression.",
+    mechanismDetail: "Additive CNS depression through combined effects on GABA neurotransmission and neuronal calcium channels.",
+    management: "Avoid alcohol while taking gabapentinoids. Counsel patients about increased sedation risk.",
+    monitoringRequired: false,
+    sources: ["FDA Label", "Clinical Guidelines"],
+  },
 ];
 
 // ============================================================================
@@ -1338,6 +1532,8 @@ export const THIAZIDE_DRUGS = [
 export function getDrugClass(drugName: string): string | null {
   const normalized = drugName.toLowerCase().trim();
   
+  // Check acetaminophen first (before opioids since some combo products contain both)
+  if (ACETAMINOPHEN_DRUGS.some(d => normalized.includes(d))) return "acetaminophen";
   if (SSRI_DRUGS.some(d => normalized.includes(d))) return "ssri";
   if (SNRI_DRUGS.some(d => normalized.includes(d))) return "snri";
   if (MAOI_DRUGS.some(d => normalized.includes(d))) return "maoi";
@@ -1361,6 +1557,8 @@ export function getDrugClass(drugName: string): string | null {
   if (DOAC_DRUGS.some(d => normalized.includes(d))) return "doac";
   if (FLUOROQUINOLONE_DRUGS.some(d => normalized.includes(d))) return "fluoroquinolone";
   if (THIAZIDE_DRUGS.some(d => normalized.includes(d))) return "thiazide";
+  if (CORTICOSTEROID_DRUGS.some(d => normalized.includes(d))) return "corticosteroid";
+  if (GABAPENTINOID_DRUGS.some(d => normalized.includes(d))) return "gabapentinoid";
   
   return null;
 }

@@ -1,10 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Healthcare AI Assistant</title>
+  <title>Health Companion — Elite AI Assistant</title>
+  <meta name="description"
+    content="Premium AI-powered health companion with real-time FDA data, drug interactions, and clinical insights">
+
+  <!-- Preload fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap"
+    rel="stylesheet">
+
   <style>
+    /* ═══════════════════════════════════════════════════════════════════════════
+       ELITE DESIGN TOKENS
+       ═══════════════════════════════════════════════════════════════════════════ */
+    :root {
+      /* Premium Palette - Medical/Tech Hybrid */
+      --color-primary: #0F172A;
+      --color-primary-light: #334155;
+      --color-accent: #3B82F6;
+      /* Modern Blue */
+      --color-accent-glow: rgba(59, 130, 246, 0.5);
+      --color-success: #10B981;
+      --color-warning: #F59E0B;
+      --color-danger: #EF4444;
+      --color-info: #6366F1;
+
+      /* Glassmorphism & Backgrounds */
+      --bg-body: #F8FAFC;
+      --bg-glass: rgba(255, 255, 255, 0.7);
+      --bg-card: #FFFFFF;
+      --border-glass: rgba(255, 255, 255, 0.5);
+      --border-subtle: rgba(0, 0, 0, 0.05);
+
+      /* Typography */
+      --font-sans: 'Outfit', sans-serif;
+      --font-display: 'Playfair Display', serif;
+
+      /* Shadows (Soft & Deep) */
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --shadow-glow: 0 0 20px var(--color-accent-glow);
+
+      /* Radius */
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+
+      /* Transitions */
+      --ease-elastic: cubic-bezier(0.5, 1.25, 0.75, 1.25);
+    }
+
+    [data-theme="dark"] {
+      --color-primary: #F8FAFC;
+      --color-primary-light: #94A3B8;
+      --bg-body: #0F172A;
+      --bg-glass: rgba(30, 41, 59, 0.7);
+      --bg-card: #1E293B;
+      --border-glass: rgba(255, 255, 255, 0.1);
+      --border-subtle: rgba(255, 255, 255, 0.05);
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -12,587 +73,1900 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: var(--font-sans);
+      background: var(--bg-body);
+      color: var(--color-primary);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%);
     }
 
-    .container {
-      width: 100%;
-      max-width: 900px;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-      overflow: hidden;
+    /* Glass Effect Utility */
+    .glass-panel {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .app-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      gap: 2rem;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-radius: var(--radius-xl);
+      margin-bottom: 1rem;
+    }
+
+    .brand h1 {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--color-accent), var(--color-success));
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Dashboard Grid */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 2rem;
+      height: calc(100vh - 140px);
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+        height: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar {
+        display: contents;
+      }
+
+      .chat-panel {
+        order: 1;
+      }
+
+      #quickActionsCard {
+        order: 2;
+      }
+
+      .sidebar>.card:not(#quickActionsCard),
+      .sidebar>button {
+        order: 3;
+      }
+    }
+
+    /* Left Panel: Medications & Quick Adds */
+    .sidebar {
       display: flex;
       flex-direction: column;
-      height: 90vh;
-      max-height: 800px;
+      gap: 1.5rem;
+      overflow-y: auto;
+      padding-right: 0.5rem;
     }
 
-    .header {
-      background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
-      color: white;
-      padding: 20px 25px;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      justify-content: space-between;
+    .card {
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: transform 0.2s ease;
     }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 15px;
+    .card:hover {
+      transform: translateY(-2px);
     }
 
-    .clear-btn {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: background 0.2s;
-    }
-
-    .clear-btn:hover {
-      background: rgba(255,255,255,0.2);
-    }
-
-    .header-icon {
-      font-size: 2rem;
-    }
-
-    .header-text h1 {
-      font-size: 1.4rem;
+    .section-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-primary-light);
+      margin-bottom: 1rem;
       font-weight: 600;
     }
 
-    .header-text p {
+    /* Quick Add Buttons */
+    .quick-add-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .quick-add-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 0.75rem;
+      border-radius: var(--radius-lg);
       font-size: 0.85rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .quick-add-btn:hover {
+      border-color: var(--color-accent);
+      background: rgba(59, 130, 246, 0.05);
+      transform: scale(1.02);
+    }
+
+    .quick-add-btn span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-accent);
+    }
+
+    /* Medication List */
+    .med-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .med-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border-left: 3px solid var(--color-accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Chat Area */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      line-height: 1.6;
+      animation: messageSlide 0.3s var(--ease-elastic);
+    }
+
+    @keyframes messageSlide {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--color-accent), #2563EB);
+      color: white;
+      border-bottom-right-radius: 4px;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-bottom-left-radius: 4px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 1.5rem;
+      background: var(--bg-glass);
+      border-top: 1px solid var(--border-glass);
+      display: flex;
+      gap: 1rem;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 1rem 1.5rem;
+      border-radius: 99px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      font-family: inherit;
+      font-size: 1rem;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .send-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+
+    .send-btn:hover {
+      transform: scale(1.1);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       ELITE MARKDOWN RENDERING - Tables, Headers, Lists, etc.
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    /* Headers */
+    .message h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 1.5rem 0 1rem 0;
+      color: var(--color-accent);
+      border-bottom: 2px solid var(--color-accent);
+      padding-bottom: 0.5rem;
+    }
+
+    .message h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin: 1.25rem 0 0.75rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .message h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 1rem 0 0.5rem 0;
+      color: var(--color-primary-light);
+    }
+
+    .message p {
+      margin-bottom: 0.75rem;
+      line-height: 1.7;
+    }
+
+    .message ul,
+    .message ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .message li {
+      margin-bottom: 0.4rem;
+      line-height: 1.6;
+    }
+
+    .message strong {
+      color: inherit;
+      font-weight: 700;
+    }
+
+    .message code {
+      background: rgba(59, 130, 246, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: var(--color-accent);
+    }
+
+    /* Horizontal Rules */
+    .message hr {
+      border: none;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+      margin: 1.5rem 0;
+    }
+
+    /* Blockquotes - Executive Summary Style */
+    .message blockquote {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1));
+      border-left: 4px solid var(--color-accent);
+      border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      font-weight: 500;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       ELITE TABLES - Responsive, Scrollable, Beautiful
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .message table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Mobile table scroll wrapper */
+    .message .table-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 1rem 0;
+    }
+
+    .message th {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+      color: white;
+      font-weight: 600;
+      text-align: left;
+      padding: 0.875rem 1rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      white-space: nowrap;
+    }
+
+    .message td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+    }
+
+    .message tr:last-child td {
+      border-bottom: none;
+    }
+
+    .message tr:hover td {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Alternating row colors */
+    .message tbody tr:nth-child(even) td {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    [data-theme="dark"] .message tbody tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* First column emphasis (for "Aspect" column) */
+    .message td:first-child {
+      font-weight: 600;
+      color: var(--color-primary);
+      white-space: nowrap;
+    }
+
+    /* Links in tables */
+    .message a {
+      color: var(--color-accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    .message a:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       MOBILE RESPONSIVE ENHANCEMENTS
+       ═══════════════════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .app-container {
+        padding: 1rem;
+      }
+
+      .header {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+      }
+
+      .brand h1 {
+        font-size: 1.4rem;
+      }
+
+      .dashboard {
+        height: auto;
+      }
+
+      .sidebar {
+        order: 2;
+      }
+
+      .chat-panel {
+        order: 1;
+        min-height: 60vh;
+      }
+
+      .message {
+        max-width: 95%;
+        padding: 1rem;
+      }
+
+      .message h1 {
+        font-size: 1.25rem;
+      }
+
+      .message h2 {
+        font-size: 1.1rem;
+      }
+
+      /* Stack table cells on very small screens */
+      .message th,
+      .message td {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+      }
+
+      .chat-input {
+        padding: 0.875rem 1rem;
+      }
+
+      .quick-action-btn {
+        padding: 0.875rem 1rem;
+      }
+
+      .quick-action-btn .label-subtitle {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .message table {
+        font-size: 0.8rem;
+      }
+
+      .message th {
+        font-size: 0.75rem;
+        padding: 0.5rem;
+      }
+
+      .message td {
+        padding: 0.5rem;
+      }
+
+      .quick-add-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       CUSTOM MEDICATION INPUT
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .custom-med-input-container {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .custom-med-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: var(--color-primary);
+      transition: all 0.2s;
+    }
+
+    .custom-med-input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .custom-med-input::placeholder {
+      color: var(--color-primary-light);
+      opacity: 0.6;
+    }
+
+    .custom-med-add-btn {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      border: none;
+      background: linear-gradient(135deg, var(--color-success), #059669);
+      color: white;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .custom-med-add-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .custom-med-add-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DRUG SEARCH INPUT
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .drug-search-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: var(--color-primary);
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+    }
+
+    .drug-search-input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .drug-search-input::placeholder {
+      color: var(--color-primary-light);
+      opacity: 0.6;
+    }
+
+    .quick-add-grid {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .quick-add-btn.hidden {
+      display: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       QUICK ACTIONS - ELITE BUTTONS
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .quick-actions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .quick-action-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border: none;
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: white;
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+
+    .quick-action-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .quick-action-btn:hover::before {
+      opacity: 1;
+    }
+
+    .quick-action-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 25px -5px var(--btn-glow);
+    }
+
+    .quick-action-btn:active {
+      transform: scale(0.98);
+    }
+
+    .quick-action-btn .icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+
+    .quick-action-btn .label {
+      flex: 1;
+    }
+
+    .quick-action-btn .label-title {
+      display: block;
+      font-weight: 600;
+    }
+
+    .quick-action-btn .label-subtitle {
+      display: block;
+      font-size: 0.75rem;
       opacity: 0.8;
       margin-top: 2px;
     }
 
-    .chat-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      background: #f7fafc;
+    /* Button Variants */
+    .qa-interactions {
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      --btn-glow: rgba(99, 102, 241, 0.5);
     }
 
-    .message {
-      margin-bottom: 16px;
-      display: flex;
-      gap: 12px;
-      animation: fadeIn 0.3s ease;
+    .qa-side-effects {
+      background: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+      --btn-glow: rgba(245, 158, 11, 0.5);
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    .qa-clinical-trials {
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      --btn-glow: rgba(16, 185, 129, 0.5);
     }
 
-    .message.user {
-      flex-direction: row-reverse;
+    .qa-pricing {
+      background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+      --btn-glow: rgba(59, 130, 246, 0.5);
     }
 
-    .avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
+    .qa-dosage {
+      background: linear-gradient(135deg, #EC4899 0%, #BE185D 100%);
+      --btn-glow: rgba(236, 72, 153, 0.5);
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: var(--shadow-lg), 0 0 60px rgba(59, 130, 246, 0.15);
+      transform: scale(0.9) translateY(20px);
+      transition: transform 0.3s var(--ease-elastic);
+    }
+
+    .modal-overlay.active .modal-content {
+      transform: scale(1) translateY(0);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-header .icon {
+      font-size: 2rem;
+    }
+
+    .modal-header h2 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      color: var(--color-primary);
+      margin: 0;
+    }
+
+    .modal-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--color-primary-light);
+      transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+      color: var(--color-danger);
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .modal-field label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-primary-light);
+    }
+
+    .modal-field input,
+    .modal-field textarea,
+    .modal-field select {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-body);
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--color-primary);
+      transition: all 0.2s;
+    }
+
+    .modal-field input:focus,
+    .modal-field textarea:focus,
+    .modal-field select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .modal-field textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .modal-submit {
+      margin-top: 0.5rem;
+      padding: 1rem;
+      border: none;
+      border-radius: var(--radius-lg);
+      background: var(--color-primary);
+      color: white;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .modal-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Chip Select (for multiple drug input) */
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-body);
+      min-height: 44px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      background: var(--color-accent);
+      color: white;
+      border-radius: 99px;
+      font-size: 0.85rem;
+    }
+
+    .chip-remove {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      opacity: 0.8;
+    }
+
+    .chip-remove:hover {
+      opacity: 1;
+    }
+
+    .chip-input {
+      border: none;
+      background: transparent;
+      flex: 1;
+      min-width: 100px;
+      padding: 0;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--color-primary);
+    }
+
+    .chip-input:focus {
+      outline: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       LIVE SYSTEM STATUS INDICATOR
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-lg);
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .status-indicator:hover {
+      background: var(--bg-glass);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      position: relative;
       flex-shrink: 0;
     }
 
-    .message.assistant .avatar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .status-dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      opacity: 0;
     }
 
-    .message.user .avatar {
-      background: #4a5568;
+    .status-healthy .status-dot {
+      background: var(--color-success);
+      box-shadow: 0 0 8px var(--color-success);
     }
 
-    .bubble {
-      max-width: 75%;
-      padding: 12px 16px;
-      border-radius: 16px;
-      line-height: 1.5;
-      font-size: 0.95rem;
+    .status-healthy .status-dot::after {
+      border: 2px solid var(--color-success);
+      animation: pulse-healthy 2s infinite;
     }
 
-    .message.assistant .bubble {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px 16px 16px 4px;
+    .status-degraded .status-dot {
+      background: var(--color-warning);
+      box-shadow: 0 0 8px var(--color-warning);
     }
 
-    .message.user .bubble {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-radius: 16px 16px 4px 16px;
+    .status-degraded .status-dot::after {
+      border: 2px solid var(--color-warning);
+      animation: pulse-degraded 1s infinite;
     }
 
-    .bubble h1, .bubble h2, .bubble h3 {
-      margin: 12px 0 8px 0;
-      font-size: 1rem;
-      color: #2d3748;
+    .status-unhealthy .status-dot {
+      background: var(--color-danger);
+      box-shadow: 0 0 8px var(--color-danger);
     }
 
-    .bubble h1:first-child, .bubble h2:first-child, .bubble h3:first-child {
-      margin-top: 0;
+    .status-unhealthy .status-dot::after {
+      border: 2px solid var(--color-danger);
+      animation: pulse-urgent 0.5s infinite;
     }
 
-    .bubble p {
-      margin: 8px 0;
+    @keyframes pulse-healthy {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0;
+        transform: scale(1.8);
+      }
     }
 
-    .bubble ul, .bubble ol {
-      margin: 8px 0;
-      padding-left: 20px;
+    @keyframes pulse-degraded {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.3;
+        transform: scale(1.5);
+      }
     }
 
-    .bubble li {
-      margin: 4px 0;
+    @keyframes pulse-urgent {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
     }
 
-    .bubble strong {
-      color: #4a5568;
+    .status-text {
+      font-size: 0.85rem;
+      color: var(--color-primary-light);
     }
 
-    .message.user .bubble strong {
-      color: white;
+    .status-chevron {
+      width: 14px;
+      height: 14px;
+      color: var(--color-primary-light);
+      transition: transform 0.2s ease;
     }
 
-    .bubble code {
-      background: #edf2f7;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.85em;
+    .status-indicator.open .status-chevron {
+      transform: rotate(180deg);
     }
 
-    .bubble table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-      font-size: 0.9rem;
+    .status-panel {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      width: 320px;
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg), 0 0 40px rgba(59, 130, 246, 0.15);
+      padding: 1.5rem;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: all 0.3s var(--ease-elastic);
+      z-index: 100;
+      margin-top: 8px;
     }
 
-    .bubble th, .bubble td {
-      border: 1px solid #e2e8f0;
-      padding: 8px;
-      text-align: left;
+    .status-panel.open {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
     }
 
-    .bubble th {
-      background: #f7fafc;
+    .status-panel-header {
       font-weight: 600;
-    }
-
-    .typing {
-      display: flex;
-      gap: 4px;
-      padding: 8px 0;
-    }
-
-    .typing span {
-      width: 8px;
-      height: 8px;
-      background: #a0aec0;
-      border-radius: 50%;
-      animation: bounce 1.4s infinite ease-in-out;
-    }
-
-    .typing span:nth-child(1) { animation-delay: -0.32s; }
-    .typing span:nth-child(2) { animation-delay: -0.16s; }
-
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
-
-    .input-area {
-      padding: 20px;
-      background: white;
-      border-top: 1px solid #e2e8f0;
-    }
-
-    .input-wrapper {
-      display: flex;
-      gap: 12px;
-      align-items: flex-end;
-    }
-
-    .input-wrapper textarea {
-      flex: 1;
-      padding: 14px 18px;
-      border: 2px solid #e2e8f0;
-      border-radius: 24px;
-      font-size: 1rem;
-      resize: none;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.2s;
-      min-height: 52px;
-      max-height: 150px;
-    }
-
-    .input-wrapper textarea:focus {
-      border-color: #667eea;
-    }
-
-    .send-btn {
-      width: 52px;
-      height: 52px;
-      border: none;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 1.3rem;
-      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 1rem;
       display: flex;
       align-items: center;
-      justify-content: center;
-    }
-
-    .send-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .suggestions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .suggestion {
-      padding: 8px 14px;
-      background: #edf2f7;
-      border: none;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      color: #4a5568;
-    }
-
-    .suggestion:hover {
-      background: #e2e8f0;
-    }
-
-    .disclaimer {
-      font-size: 0.75rem;
-      color: #718096;
-      text-align: center;
-      margin-top: 12px;
-      padding: 0 10px;
-    }
-
-    .error {
-      background: #fed7d7;
-      color: #c53030;
-      padding: 12px 16px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-    }
-
-    .welcome {
-      text-align: center;
-      padding: 40px 20px;
-      color: #4a5568;
-    }
-
-    .welcome h2 {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-      color: #2d3748;
-    }
-
-    .welcome p {
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-top: 20px;
-    }
-
-    .feature {
-      background: white;
-      padding: 15px;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
-      text-align: left;
-    }
-
-    .feature-icon {
-      font-size: 1.5rem;
-      margin-bottom: 8px;
-    }
-
-    .feature h3 {
+      gap: 0.5rem;
       font-size: 0.95rem;
-      margin-bottom: 4px;
-      color: #2d3748;
     }
 
-    .feature p {
-      font-size: 0.8rem;
-      color: #718096;
-      margin: 0;
+    .status-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .status-metric:last-of-type {
+      border-bottom: none;
+    }
+
+    .metric-label {
+      color: var(--color-primary-light);
+      font-size: 0.85rem;
+    }
+
+    .metric-value {
+      font-weight: 600;
+      font-size: 0.9rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-good {
+      color: var(--color-success);
+    }
+
+    .metric-warn {
+      color: var(--color-warning);
+    }
+
+    .metric-bad {
+      color: var(--color-danger);
+    }
+
+    .status-footer {
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-subtle);
+      font-size: 0.75rem;
+      color: var(--color-primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-refresh-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.25rem;
+      color: var(--color-primary-light);
+      transition: all 0.2s;
+      border-radius: 4px;
+    }
+
+    .status-refresh-btn:hover {
+      color: var(--color-accent);
+      background: var(--bg-glass);
+    }
+
+    .status-refresh-btn.spinning {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
     }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <div class="header-icon">🏥</div>
-        <div class="header-text">
-          <h1>Healthcare AI Assistant</h1>
-          <p>Powered by FDA, PubMed & Medicare data</p>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header glass-panel">
+      <div class="brand">
+        <h1>Health Companion</h1>
+      </div>
+      <div class="status-indicator status-healthy" id="systemStatus" onclick="toggleStatusPanel(event)">
+        <div class="status-dot"></div>
+        <span class="status-text">System Elite: <strong id="statusLabel">Initializing...</strong></span>
+        <svg class="status-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+
+        <div class="status-panel" id="statusPanel">
+          <div class="status-panel-header">
+            <span>📊</span> System Metrics
+          </div>
+
+          <div class="status-metric">
+            <span class="metric-label">Uptime</span>
+            <span class="metric-value" id="metricUptime">--</span>
+          </div>
+
+          <div class="status-metric">
+            <span class="metric-label">OpenFDA API</span>
+            <span class="metric-value" id="metricFda">--</span>
+          </div>
+
+          <div class="status-metric">
+            <span class="metric-label">OpenAI</span>
+            <span class="metric-value" id="metricOpenai">--</span>
+          </div>
+
+          <div class="status-metric">
+            <span class="metric-label">Cache Hit Rate</span>
+            <span class="metric-value" id="metricCache">--</span>
+          </div>
+
+          <div class="status-metric">
+            <span class="metric-label">Active Sessions</span>
+            <span class="metric-value" id="metricSessions">--</span>
+          </div>
+
+          <div class="status-footer">
+            <span>Last checked: <span id="lastChecked">--</span></span>
+            <button class="status-refresh-btn" onclick="refreshStatus(event)" title="Refresh now">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
-      <button class="clear-btn" onclick="clearChat()">🗑️ New Chat</button>
-    </div>
+    </header>
 
-    <div class="chat-area" id="chatArea">
-      <div class="welcome">
-        <h2>Welcome! How can I help you today?</h2>
-        <p>I can answer questions about medications, side effects, clinical guidelines, and healthcare costs using real FDA and medical data.</p>
-        
-        <div class="features">
-          <div class="feature">
-            <div class="feature-icon">💊</div>
-            <h3>Drug Interactions</h3>
-            <p>Check multiple medications for dangerous interactions</p>
-          </div>
-          <div class="feature">
-            <div class="feature-icon">🔬</div>
-            <h3>Clinical Trials</h3>
-            <p>Real trial data from ClinicalTrials.gov</p>
-          </div>
-          <div class="feature">
-            <div class="feature-icon">⚠️</div>
-            <h3>Side Effects</h3>
-            <p>Official FDA labeling + FAERS reports</p>
-          </div>
-          <div class="feature">
-            <div class="feature-icon">📋</div>
-            <h3>Guidelines</h3>
-            <p>Evidence-based treatment recommendations</p>
+    <div class="dashboard">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <!-- Quick Actions Section (First) -->
+        <div class="card glass-panel" id="quickActionsCard">
+          <h3 class="section-title">⚡ Quick Actions</h3>
+          <div class="quick-actions-container" id="quickActionsContainer">
+            <button class="quick-action-btn qa-interactions" onclick="openQuickAction('interactions')">
+              <span class="icon">⚗️</span>
+              <span class="label">
+                <span class="label-title">Drug Interactions</span>
+                <span class="label-subtitle">Check safety between multiple medications</span>
+              </span>
+            </button>
+
+            <button class="quick-action-btn qa-side-effects" onclick="openQuickAction('sideEffects')">
+              <span class="icon">⚠️</span>
+              <span class="label">
+                <span class="label-title">Side Effects Analysis</span>
+                <span class="label-subtitle">Comprehensive adverse event report</span>
+              </span>
+            </button>
+
+            <button class="quick-action-btn qa-clinical-trials" onclick="openQuickAction('clinicalTrials')">
+              <span class="icon">🔬</span>
+              <span class="label">
+                <span class="label-title">Clinical Trials</span>
+                <span class="label-subtitle">Find active studies for conditions</span>
+              </span>
+            </button>
+
+            <button class="quick-action-btn qa-pricing" onclick="openQuickAction('pricing')">
+              <span class="icon">💰</span>
+              <span class="label">
+                <span class="label-title">Drug Pricing</span>
+                <span class="label-subtitle">Medicare & cost comparison data</span>
+              </span>
+            </button>
+
+            <button class="quick-action-btn qa-dosage" onclick="openQuickAction('dosage')">
+              <span class="icon">💊</span>
+              <span class="label">
+                <span class="label-title">Dosage Guidance</span>
+                <span class="label-subtitle">Personalized dosing recommendations</span>
+              </span>
+            </button>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="input-area">
-      <div class="input-wrapper">
-        <textarea 
-          id="userInput" 
-          placeholder="Ask about medications, side effects, or treatments..."
-          rows="1"
-          onkeydown="handleKeyDown(event)"
-        ></textarea>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+        <!-- Your Cabinet (Second) -->
+        <div class="card glass-panel">
+          <h3 class="section-title">Your Cabinet</h3>
+          <div id="medList" class="med-list">
+            <!-- Meds injected here -->
+            <div class="med-item" style="opacity: 0.5; font-style: italic;">No medications added</div>
+          </div>
+          <div class="custom-med-input-container">
+            <input type="text" id="customMedInput" class="custom-med-input" placeholder="Add your own medication..."
+              onkeypress="handleCustomMedKeypress(event)">
+            <button class="custom-med-add-btn" onclick="addCustomMedication()">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Common Drugs Section (Third) -->
+        <div class="card glass-panel">
+          <h3 class="section-title">Common Drugs (Quick Add)</h3>
+          <input type="text" id="drugSearchInput" class="drug-search-input" placeholder="🔍 Search medications..."
+            oninput="filterDrugList()">
+          <div class="quick-add-grid" id="quickAddGrid">
+            <!-- Buttons injected by JS -->
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <button id="checkInteractionsBtn" class="card glass-panel"
+          style="width: 100%; cursor: pointer; text-align: center; font-weight: 600; color: var(--color-accent);">
+          🔍 Check Cabinet Interactions
+        </button>
+      </aside>
+
+      <!-- Chat Interface -->
+      <main class="chat-panel glass-panel">
+        <div class="chat-messages" id="chatMessages">
+          <div class="message assistant">
+            <h3>Hello. I am your elite health assistant.</h3>
+            <p>I verify all information against FDA databases and clinical trials. <br>
+              Use the sidebar to add medications or ask me anything.</p>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <input type="text" class="chat-input" id="chatInput"
+            placeholder="Ask about symptoms, drugs, or clinical trials...">
+          <button class="send-btn" id="sendBtn">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Quick Action Modal -->
+  <div class="modal-overlay" id="quickActionModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="icon" id="modalIcon">⚗️</span>
+        <h2 id="modalTitle">Quick Action</h2>
+        <button class="modal-close" onclick="closeModal()">×</button>
       </div>
-      <div class="suggestions">
-        <button class="suggestion" onclick="askQuestion('Check interactions between metformin, lisinopril, and aspirin')">💊 Drug interactions</button>
-        <button class="suggestion" onclick="askQuestion('What clinical trials show about Ozempic for weight loss?')">🔬 Ozempic trials</button>
-        <button class="suggestion" onclick="askQuestion('What are the proven side effects of atorvastatin?')">⚠️ Statin side effects</button>
-        <button class="suggestion" onclick="askQuestion('Latest treatment guidelines for Type 2 diabetes')">📋 Diabetes guidelines</button>
-      </div>
-      <div class="disclaimer">
-        ⚕️ For educational purposes only. Always consult a healthcare professional for medical advice.
+      <div class="modal-body" id="modalBody">
+        <!-- Dynamic fields injected here -->
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script>
-    const chatArea = document.getElementById('chatArea');
-    const userInput = document.getElementById('userInput');
-    const sendBtn = document.getElementById('sendBtn');
-    let isFirstMessage = true;
+    // Expanded list of ~40 common medications
+    const COMMON_DRUGS = [
+      // Cardiovascular
+      "Atorvastatin", "Lisinopril", "Amlodipine", "Metoprolol", "Losartan",
+      "Simvastatin", "Hydrochlorothiazide", "Carvedilol", "Warfarin", "Clopidogrel",
+      "Furosemide", "Atenolol", "Rosuvastatin", "Valsartan", "Diltiazem",
+      // Diabetes & Thyroid
+      "Metformin", "Levothyroxine", "Glipizide", "Insulin Glargine", "Januvia",
+      // Pain & Inflammation
+      "Ibuprofen", "Acetaminophen", "Aspirin", "Naproxen", "Tramadol",
+      "Prednisone", "Meloxicam", "Gabapentin", "Pregabalin", "Duloxetine",
+      // Respiratory
+      "Albuterol", "Fluticasone", "Montelukast", "Tiotropium", "Budesonide",
+      // GI & Acid Reflux
+      "Omeprazole", "Pantoprazole", "Famotidine", "Esomeprazole",
+      // Mental Health
+      "Sertraline", "Escitalopram", "Fluoxetine", "Trazodone", "Alprazolam",
+      "Lorazepam", "Bupropion", "Venlafaxine", "Citalopram", "Amitriptyline",
+      // Antibiotics
+      "Amoxicillin", "Azithromycin", "Ciprofloxacin", "Doxycycline", "Cephalexin",
+      // Other Common
+      "Tamsulosin", "Finasteride", "Cyclobenzaprine", "Zolpidem", "Hydroxyzine"
+    ];
+    // Keep backwards compatibility
+    const TOP_10_DRUGS = COMMON_DRUGS.slice(0, 10);
 
-    // Auto-resize textarea
-    userInput.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+    const state = {
+      medications: new Set(),
+      sessionId: 'session-' + Math.random().toString(36).substr(2, 9),
+      currentAction: null,
+      modalDrugs: []
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ELITE PROMPT TEMPLATES - Optimized for premium AI responses
+    // ═══════════════════════════════════════════════════════════════════════════
+    const QUICK_ACTIONS = {
+      interactions: {
+        icon: '⚗️',
+        title: 'Drug Interaction Check',
+        fields: [
+          { id: 'drugs', label: 'Medications to Check', type: 'chips', placeholder: 'Type drug name and press Enter...' },
+          { id: 'conditions', label: 'Existing Conditions (optional)', type: 'text', placeholder: 'e.g., diabetes, hypertension' }
+        ],
+        buildPrompt: (data) => `
+**DRUG INTERACTION ANALYSIS REQUEST**
+
+Perform a comprehensive, clinical-grade interaction analysis for the following medications:
+${data.drugs.map(d => `• ${d}`).join('\n')}
+${data.conditions ? `\n**Patient Conditions:** ${data.conditions}` : ''}
+
+**Required Analysis:**
+1. **Pharmacokinetic Interactions** — Absorption, metabolism (CYP450), distribution, excretion effects
+2. **Pharmacodynamic Interactions** — Additive, synergistic, or antagonistic effects
+3. **Clinical Significance Rating** — Rate each interaction: Major | Moderate | Minor | None
+4. **Risk Factors** — Age, renal/hepatic impairment, timing considerations
+5. **Management Recommendations** — Dose adjustments, monitoring parameters, alternatives
+
+**Output Format:** Use clear headers, bullet points, and highlight critical warnings with ⚠️ symbols.
+Cite FDA labeling or clinical databases where applicable.
+        `.trim()
+      },
+
+      sideEffects: {
+        icon: '⚠️',
+        title: 'Side Effects Analysis',
+        fields: [
+          { id: 'drug', label: 'Medication Name', type: 'text', placeholder: 'e.g., Metformin' },
+          { id: 'duration', label: 'How long taking? (optional)', type: 'text', placeholder: 'e.g., 3 months' },
+          { id: 'concerns', label: 'Specific concerns (optional)', type: 'textarea', placeholder: 'Any symptoms you\'re experiencing?' }
+        ],
+        buildPrompt: (data) => `
+**COMPREHENSIVE SIDE EFFECTS ANALYSIS**
+
+Medication: **${data.drug}**
+${data.duration ? `Duration of Use: ${data.duration}` : ''}
+${data.concerns ? `Patient Concerns: ${data.concerns}` : ''}
+
+**Provide a thorough analysis including:**
+
+1. **Common Side Effects** (>10% incidence)
+   - Expected onset, typical duration, management strategies
+
+2. **Less Common but Notable** (1-10% incidence)
+   - Risk factors, warning signs
+
+3. **Rare but Serious** (<1% incidence)
+   - Black box warnings, when to seek immediate care
+
+4. **Long-term Considerations**
+   - Monitoring requirements, organ system effects
+
+5. **FDA Adverse Event Data**
+   - Most frequently reported events from post-market surveillance
+
+6. **Practical Recommendations**
+   - Timing of doses, food interactions, symptom mitigation
+
+Format with clear sections and ⚠️ for critical warnings.
+        `.trim()
+      },
+
+      clinicalTrials: {
+        icon: '🔬',
+        title: 'Clinical Trial Search',
+        fields: [
+          { id: 'condition', label: 'Medical Condition', type: 'text', placeholder: 'e.g., Type 2 Diabetes, Migraine' },
+          { id: 'location', label: 'Preferred Location (optional)', type: 'text', placeholder: 'e.g., New York, California' },
+          { id: 'phase', label: 'Trial Phase (optional)', type: 'select', options: ['Any Phase', 'Phase 1', 'Phase 2', 'Phase 3', 'Phase 4'] }
+        ],
+        buildPrompt: (data) => `
+Search for actively recruiting clinical trials for **${data.condition}**.
+${data.location ? `Preferred location: ${data.location}` : ''}
+${data.phase && data.phase !== 'Any Phase' ? `Filter by: ${data.phase}` : ''}
+
+**Format:** Use the card format from your training. Show TOP 5 trials max. Include "Why Consider" and "Next Steps".
+        `.trim()
+      },
+
+      pricing: {
+        icon: '💰',
+        title: 'Drug Pricing Lookup',
+        fields: [
+          { id: 'drug', label: 'Medication Name', type: 'text', placeholder: 'e.g., Humira, Eliquis' },
+          { id: 'dosage', label: 'Dosage & Form (optional)', type: 'text', placeholder: 'e.g., 40mg tablet, 10mg/ml injection' },
+          { id: 'insurance', label: 'Insurance Type (optional)', type: 'select', options: ['Not specified', 'Medicare Part D', 'Medicaid', 'Commercial', 'Uninsured'] }
+        ],
+        buildPrompt: (data) => `
+**DRUG PRICING & COST ANALYSIS**
+
+**Medication:** ${data.drug}
+${data.dosage ? `**Dosage/Form:** ${data.dosage}` : ''}
+${data.insurance && data.insurance !== 'Not specified' ? `**Insurance:** ${data.insurance}` : ''}
+
+**Provide comprehensive pricing information:**
+
+1. **Average Retail Price**
+   - Cash price at major pharmacies (CVS, Walgreens, Walmart)
+   - 30-day and 90-day supply estimates
+
+2. **Medicare/Insurance Pricing**
+   - Typical copay ranges by tier
+   - Deductible phase vs. coverage gap pricing
+
+3. **Cost-Saving Options**
+   - Generic equivalents (if available) with price comparison
+   - Authorized generics or biosimilars
+   - Manufacturer patient assistance programs
+   - GoodRx, RxSaver, or similar discount programs
+   - Mail-order pharmacy savings
+
+4. **Therapeutic Alternatives**
+   - Lower-cost medications in same drug class
+   - Comparative efficacy notes
+
+5. **Practical Recommendations**
+   - Best strategy based on insurance status
+   - Questions to ask pharmacist/prescriber
+
+Include specific dollar amounts where available. Format clearly with comparison tables if helpful.
+        `.trim()
+      },
+
+      dosage: {
+        icon: '💊',
+        title: 'Dosage Guidance',
+        fields: [
+          { id: 'drug', label: 'Medication Name', type: 'text', placeholder: 'e.g., Lisinopril' },
+          { id: 'indication', label: 'What is it for?', type: 'text', placeholder: 'e.g., high blood pressure, heart failure' },
+          { id: 'patientInfo', label: 'Patient Details (optional)', type: 'textarea', placeholder: 'Age, weight, kidney function, other medications...' }
+        ],
+        buildPrompt: (data) => `
+**PERSONALIZED DOSAGE GUIDANCE**
+
+**Medication:** ${data.drug}
+**Indication:** ${data.indication}
+${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
+
+**Provide comprehensive dosing information:**
+
+1. **Standard Dosing**
+   - Initial dose recommendations
+   - Titration schedule
+   - Maximum recommended dose
+   - Typical maintenance range
+
+2. **Special Population Adjustments**
+   - Renal impairment (with eGFR thresholds)
+   - Hepatic impairment
+   - Elderly patients (>65 years)
+   - Pediatric considerations (if applicable)
+
+3. **Administration Guidelines**
+   - Optimal timing (morning vs. evening, with/without food)
+   - Crushing/splitting considerations
+   - Missed dose instructions
+   - What NOT to take it with
+
+4. **Monitoring Parameters**
+   - Labs to check before starting & during therapy
+   - Frequency of monitoring
+   - Target therapeutic ranges (if applicable)
+
+5. **Red Flags**
+   - Signs of over/under-dosing
+   - When to contact prescriber immediately
+
+**Include clinical pearls and practical tips for optimal therapy.**
+        `.trim()
+      }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MODAL MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.openQuickAction = (actionKey) => {
+      const action = QUICK_ACTIONS[actionKey];
+      if (!action) return;
+
+      state.currentAction = actionKey;
+      state.modalDrugs = [];
+
+      // Populate modal
+      document.getElementById('modalIcon').textContent = action.icon;
+      document.getElementById('modalTitle').textContent = action.title;
+
+      const body = document.getElementById('modalBody');
+      body.innerHTML = action.fields.map(field => {
+        if (field.type === 'chips') {
+          return `
+            <div class="modal-field">
+              <label>${field.label}</label>
+              <div class="chip-container" id="chipContainer">
+                <input type="text" class="chip-input" id="chipInput" placeholder="${field.placeholder}"
+                       onkeydown="handleChipInput(event)">
+              </div>
+            </div>
+          `;
+        } else if (field.type === 'select') {
+          return `
+            <div class="modal-field">
+              <label>${field.label}</label>
+              <select id="field_${field.id}">
+                ${field.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+              </select>
+            </div>
+          `;
+        } else if (field.type === 'textarea') {
+          return `
+            <div class="modal-field">
+              <label>${field.label}</label>
+              <textarea id="field_${field.id}" placeholder="${field.placeholder}"></textarea>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="modal-field">
+              <label>${field.label}</label>
+              <input type="text" id="field_${field.id}" placeholder="${field.placeholder}">
+            </div>
+          `;
+        }
+      }).join('') + '<button class="modal-submit" onclick="submitQuickAction()">Generate Analysis →</button>';
+
+      // Pre-populate drugs from cabinet if applicable
+      if (actionKey === 'interactions' && state.medications.size > 0) {
+        setTimeout(() => {
+          state.modalDrugs = Array.from(state.medications);
+          renderChips();
+        }, 50);
+      }
+
+      document.getElementById('quickActionModal').classList.add('active');
+    };
+
+    window.closeModal = () => {
+      document.getElementById('quickActionModal').classList.remove('active');
+      state.currentAction = null;
+      state.modalDrugs = [];
+    };
+
+    // Close modal on outside click
+    document.getElementById('quickActionModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'quickActionModal') closeModal();
     });
 
-    function handleKeyDown(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHIP INPUT (for multiple drugs)
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.handleChipInput = (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) {
         e.preventDefault();
-        sendMessage();
+        const drug = e.target.value.trim();
+        if (!state.modalDrugs.includes(drug)) {
+          state.modalDrugs.push(drug);
+          renderChips();
+        }
+        e.target.value = '';
       }
+    };
+
+    window.removeChip = (index) => {
+      state.modalDrugs.splice(index, 1);
+      renderChips();
+    };
+
+    function renderChips() {
+      const container = document.getElementById('chipContainer');
+      if (!container) return;
+
+      const input = document.getElementById('chipInput');
+      const inputHTML = input ? input.outerHTML : '';
+
+      container.innerHTML = state.modalDrugs.map((drug, i) => `
+        <span class="chip">
+          ${drug}
+          <button class="chip-remove" onclick="removeChip(${i})">×</button>
+        </span>
+      `).join('') + inputHTML;
     }
 
-    function askQuestion(question) {
-      userInput.value = question;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SUBMIT QUICK ACTION
+    // ═══════════════════════════════════════════════════════════════════════════
+    window.submitQuickAction = () => {
+      const action = QUICK_ACTIONS[state.currentAction];
+      if (!action) return;
+
+      // Gather field values
+      const data = {};
+      action.fields.forEach(field => {
+        if (field.type === 'chips') {
+          data[field.id] = state.modalDrugs;
+        } else {
+          const el = document.getElementById(`field_${field.id}`);
+          data[field.id] = el ? el.value.trim() : '';
+        }
+      });
+
+      // Validate required fields
+      const firstField = action.fields[0];
+      if (firstField.type === 'chips' && data[firstField.id].length === 0) {
+        alert('Please add at least one medication');
+        return;
+      } else if (firstField.type !== 'chips' && !data[firstField.id]) {
+        alert(`Please fill in the ${firstField.label}`);
+        return;
+      }
+
+      // Build and send the elite prompt
+      const prompt = action.buildPrompt(data);
+      closeModal();
+
+      document.getElementById('chatInput').value = prompt;
       sendMessage();
+    };
+
+    // Initialize UI
+    function init() {
+      renderQuickAdd();
+      setupEventListeners();
     }
 
-    async function clearChat() {
-      try {
-        await fetch('/api/chat/clear', { method: 'POST' });
-      } catch (e) {}
-      
-      isFirstMessage = true;
-      chatArea.innerHTML = `
-        <div class="welcome">
-          <h2>Welcome! How can I help you today?</h2>
-          <p>I provide evidence-based healthcare information using real FDA, clinical trial, and medical data.</p>
-          
-          <div class="features">
-            <div class="feature">
-              <div class="feature-icon">💊</div>
-              <h3>Drug Interactions</h3>
-              <p>Check multiple medications for dangerous interactions</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">🔬</div>
-              <h3>Clinical Trials</h3>
-              <p>Real trial data from ClinicalTrials.gov</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">⚠️</div>
-              <h3>Side Effects</h3>
-              <p>Official FDA labeling + FAERS reports</p>
-            </div>
-            <div class="feature">
-              <div class="feature-icon">📋</div>
-              <h3>Guidelines</h3>
-              <p>Evidence-based treatment recommendations</p>
-            </div>
-          </div>
-        </div>
-      `;
+    function renderQuickAdd() {
+      const grid = document.getElementById('quickAddGrid');
+      grid.innerHTML = COMMON_DRUGS.map(drug => `
+        <button class="quick-add-btn" data-drug="${drug.toLowerCase()}" onclick="addMedication('${drug}')">
+          <span></span> ${drug}
+        </button>
+      `).join('');
     }
 
-    function addMessage(content, isUser) {
-      if (isFirstMessage) {
-        chatArea.innerHTML = '';
-        isFirstMessage = false;
+    // Filter drug list based on search input
+    function filterDrugList() {
+      const searchValue = document.getElementById('drugSearchInput').value.toLowerCase().trim();
+      const buttons = document.querySelectorAll('#quickAddGrid .quick-add-btn');
+
+      buttons.forEach(btn => {
+        const drugName = btn.getAttribute('data-drug');
+        if (drugName.includes(searchValue) || searchValue === '') {
+          btn.classList.remove('hidden');
+        } else {
+          btn.classList.add('hidden');
+        }
+      });
+    }
+
+    function renderMedList() {
+      const list = document.getElementById('medList');
+      if (state.medications.size === 0) {
+        list.innerHTML = '<div class="med-item" style="opacity: 0.5; font-style: italic;">No medications added</div>';
+        return;
       }
-
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
-      
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      avatar.textContent = isUser ? '👤' : '🏥';
-      
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble';
-      
-      if (isUser) {
-        bubble.textContent = content;
-      } else {
-        // Parse markdown for assistant messages
-        bubble.innerHTML = marked.parse(content);
-      }
-      
-      messageDiv.appendChild(avatar);
-      messageDiv.appendChild(bubble);
-      chatArea.appendChild(messageDiv);
-      chatArea.scrollTop = chatArea.scrollHeight;
-    }
-
-    function showTyping() {
-      const typingDiv = document.createElement('div');
-      typingDiv.className = 'message assistant';
-      typingDiv.id = 'typing';
-      typingDiv.innerHTML = `
-        <div class="avatar">🏥</div>
-        <div class="bubble">
-          <div class="typing">
-            <span></span><span></span><span></span>
-          </div>
+      list.innerHTML = Array.from(state.medications).map(med => `
+        <div class="med-item">
+          <span>${med}</span>
+          <button onclick="removeMedication('${med}')" style="background: none; border: none; cursor: pointer; color: var(--color-danger);">✕</button>
         </div>
-      `;
-      chatArea.appendChild(typingDiv);
-      chatArea.scrollTop = chatArea.scrollHeight;
+      `).join('');
     }
 
-    function hideTyping() {
-      const typing = document.getElementById('typing');
-      if (typing) typing.remove();
-    }
+    window.addMedication = (med) => {
+      state.medications.add(med);
+      renderMedList();
+      // Optional: Auto-announce to chat
+      // addMessage('assistant', `Added **${med}** to your cabinet.`);
+    };
 
-    function showError(message) {
-      hideTyping();
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'error';
-      errorDiv.textContent = message;
-      chatArea.appendChild(errorDiv);
-      chatArea.scrollTop = chatArea.scrollHeight;
+    window.removeMedication = (med) => {
+      state.medications.delete(med);
+      renderMedList();
+    };
+
+    window.addCustomMedication = () => {
+      const input = document.getElementById('customMedInput');
+      const med = input.value.trim();
+      if (med) {
+        // Capitalize first letter of each word for consistency
+        const formattedMed = med.split(' ').map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+        state.medications.add(formattedMed);
+        renderMedList();
+        input.value = '';
+        input.focus();
+      }
+    };
+
+    window.handleCustomMedKeypress = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addCustomMedication();
+      }
+    };
+
+    function setupEventListeners() {
+      document.getElementById('sendBtn').addEventListener('click', sendMessage);
+      document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+      });
+
+      document.getElementById('checkInteractionsBtn').addEventListener('click', () => {
+        if (state.medications.size < 2) {
+          addMessage('assistant', '⚠️ Please add at least 2 medications to check for interactions.');
+          return;
+        }
+        // Open the interactions modal with cabinet meds pre-filled
+        openQuickAction('interactions');
+      });
     }
 
     async function sendMessage() {
-      const message = userInput.value.trim();
-      if (!message) return;
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
 
-      // Clear input
-      userInput.value = '';
-      userInput.style.height = 'auto';
-      
-      // Disable send button
-      sendBtn.disabled = true;
+      addMessage('user', text);
+      input.value = '';
 
-      // Show user message
-      addMessage(message, true);
-      
-      // Show typing indicator
-      showTyping();
+      // Loading state
+      const loadingId = addMessage('assistant', '<span class="loading-dots">Thinking...</span>');
 
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message })
+          body: JSON.stringify({ message: text, sessionId: state.sessionId })
         });
 
-        hideTyping();
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to get response');
-        }
-
         const data = await response.json();
-        addMessage(data.response, false);
-      } catch (error) {
-        showError(error.message || 'Something went wrong. Please try again.');
-      } finally {
-        sendBtn.disabled = false;
-        userInput.focus();
+
+        // Remove loading
+        document.getElementById(loadingId).remove();
+
+        if (data.error) {
+          addMessage('assistant', `❌ Error: ${data.error}`);
+        } else {
+          addMessage('assistant', data.response);
+        }
+      } catch (err) {
+        document.getElementById(loadingId).remove();
+        addMessage('assistant', '❌ Network Error. Please check your connection.');
       }
     }
 
-    // Focus input on load
-    userInput.focus();
+    function addMessage(role, content) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.id = 'msg-' + Date.now();
+
+      if (role === 'assistant' && !content.includes('loading-dots')) {
+        div.innerHTML = marked.parse(content);
+      } else {
+        div.innerHTML = content;
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div.id;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LIVE SYSTEM STATUS
+    // ═══════════════════════════════════════════════════════════════════════════
+    const statusElement = document.getElementById('systemStatus');
+    const statusLabel = document.getElementById('statusLabel');
+    const statusPanel = document.getElementById('statusPanel');
+
+    let statusPanelOpen = false;
+
+    window.toggleStatusPanel = (e) => {
+      e.stopPropagation();
+      statusPanelOpen = !statusPanelOpen;
+      statusPanel.classList.toggle('open', statusPanelOpen);
+      statusElement.classList.toggle('open', statusPanelOpen);
+    };
+
+    window.refreshStatus = async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.classList.add('spinning');
+      await updateSystemStatus();
+      setTimeout(() => btn.classList.remove('spinning'), 500);
+    };
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!statusElement.contains(e.target) && statusPanelOpen) {
+        statusPanelOpen = false;
+        statusPanel.classList.remove('open');
+        statusElement.classList.remove('open');
+      }
+    });
+
+    async function updateSystemStatus() {
+      try {
+        // Fetch health and stats in parallel
+        const [healthRes, statsRes] = await Promise.all([
+          fetch('/health'),
+          fetch('/stats')
+        ]);
+
+        const health = await healthRes.json();
+        const stats = await statsRes.json();
+
+        // Update status indicator class
+        statusElement.className = statusElement.className
+          .replace(/status-(healthy|degraded|unhealthy)/g, '')
+          .trim() + ` status-${health.status}`;
+
+        // Update label
+        const statusMap = { healthy: 'Online', degraded: 'Degraded', unhealthy: 'Offline' };
+        statusLabel.textContent = statusMap[health.status] || health.status;
+
+        // Update metrics
+        const uptime = health.uptime_seconds;
+        const hours = Math.floor(uptime / 3600);
+        const mins = Math.floor((uptime % 3600) / 60);
+        document.getElementById('metricUptime').textContent =
+          hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+        // FDA latency
+        const fdaEl = document.getElementById('metricFda');
+        if (health.checks?.openfda) {
+          const latency = health.checks.openfda.latency_ms;
+          fdaEl.textContent = `${latency}ms`;
+          fdaEl.className = `metric-value ${latency < 500 ? 'metric-good' : latency < 1000 ? 'metric-warn' : 'metric-bad'}`;
+        } else {
+          fdaEl.textContent = '--';
+        }
+
+        // OpenAI status
+        const aiEl = document.getElementById('metricOpenai');
+        if (health.checks?.openai) {
+          aiEl.textContent = health.checks.openai.status === 'ok' ? '✓ Connected' : '⚠ Degraded';
+          aiEl.className = `metric-value ${health.checks.openai.status === 'ok' ? 'metric-good' : 'metric-warn'}`;
+        } else {
+          aiEl.textContent = '--';
+        }
+
+        // Cache hit rate
+        const cacheEl = document.getElementById('metricCache');
+        if (stats.cache) {
+          const hits = stats.cache.hits || 0;
+          const total = hits + (stats.cache.misses || 0);
+          const rate = total > 0 ? Math.round((hits / total) * 100) : 0;
+          cacheEl.textContent = `${rate}%`;
+          cacheEl.className = `metric-value ${rate > 70 ? 'metric-good' : rate > 40 ? 'metric-warn' : 'metric-bad'}`;
+        } else {
+          cacheEl.textContent = '--';
+        }
+
+        // Active sessions
+        if (stats.sessions) {
+          document.getElementById('metricSessions').textContent = stats.sessions.active || 0;
+        }
+
+        // Last checked timestamp
+        document.getElementById('lastChecked').textContent = new Date().toLocaleTimeString();
+
+      } catch (error) {
+        console.error('Failed to fetch system status:', error);
+        statusElement.className = statusElement.className
+          .replace(/status-(healthy|degraded|unhealthy)/g, '')
+          .trim() + ' status-unhealthy';
+        statusLabel.textContent = 'Connection Error';
+      }
+    }
+
+    // Initial fetch + refresh every 30 seconds
+    updateSystemStatus();
+    setInterval(updateSystemStatus, 30000);
+
+    // Start
+    init();
   </script>
 </body>
+
 </html>
