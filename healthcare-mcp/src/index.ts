@@ -111,8 +111,10 @@ sessionManager.setChatFactory((sessionId: string) => {
 });
 
 // Security & middleware
+const helmetMiddleware =
+  (helmet as unknown as { default?: typeof helmet }).default ?? helmet;
 app.use(
-  helmet({
+  helmetMiddleware({
     // UI uses inline styles/scripts; keep CSP off until assets are externalized
     contentSecurityPolicy: false,
   })
