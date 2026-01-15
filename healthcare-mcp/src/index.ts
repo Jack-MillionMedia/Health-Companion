@@ -9,15 +9,12 @@
 // - Request deduplication (prevents duplicate API calls)
 // - Automatic retries with exponential backoff
 
-// Load environment variables FIRST (before any other imports that might use them)
-// Use override: true to ensure .env file takes precedence over shell environment variables
-import * as dotenv from "dotenv";
-dotenv.config({ override: true });
-
 import express from "express";
 import compression from "compression";
+import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 import { handleMcpRequest, handleLegacyToolsList, handleLegacyToolCall, getCacheStats } from "./mcp/handler.js";
 import { registerAllTools } from "./mcp/tools.js";
 import { HealthcareChat } from "./ai/chat.js";
@@ -27,6 +24,9 @@ import { logger, logEvents, httpLogger } from "./utils/logger.js";
 import { sessionManager, SessionConfig } from "./utils/session-manager.js";
 import { responseCache } from "./utils/cache.js";
 import { getHttpStats } from "./utils/http.js";
+import { env } from "./utils/env.js";
+import { initMonitoring } from "./utils/monitoring.js";
+import { chatMessageSchema } from "./validation/schemas.js";
 
 // Import tool handlers directly for AI integration
 import {
@@ -57,8 +57,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const PORT = env.PORT;
+const OPENAI_API_KEY = env.OPENAI_API_KEY;
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
 
 // Extend Express Request type
 declare global {
@@ -108,7 +110,14 @@ sessionManager.setChatFactory((sessionId: string) => {
   return new HealthcareChat(OPENAI_API_KEY, executeToolForAI);
 });
 
-// Middleware
+// Security & middleware
+app.use(
+  helmet({
+    // UI uses inline styles/scripts; keep CSP off until assets are externalized
+    contentSecurityPolicy: false,
+  })
+);
+
 app.use(express.json({ limit: "100kb" })); // Limit request body size
 
 // Gzip compression - reduces response size by 70-90%
@@ -123,7 +132,16 @@ app.use(compression({
   },
 }));
 
-app.use(express.static(path.join(__dirname, "web")));
+app.use(
+  express.static(path.join(__dirname, "web"), {
+    maxAge: "1h",
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-store");
+      }
+    },
+  })
+);
 
 // Apply rate limiting globally first, then specific limiters per route
 app.use(apiRateLimiter);
@@ -131,8 +149,9 @@ app.use(apiRateLimiter);
 // Request ID and structured logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
-  const requestId = Math.random().toString(36).substring(2, 10);
+  const requestId = randomUUID();
   req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
 
   // Log incoming request
   logEvents.httpRequest(requestId, req.method, req.path, req.ip || "unknown");
@@ -145,6 +164,17 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Handle invalid JSON bodies early
+app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError) {
+    res.status(400).json({ error: "Invalid JSON payload" });
+    return;
+  }
+  next(err);
+});
+
+const monitoring = initMonitoring(app);
 
 // Health check (with detailed stats)
 app.get("/health", async (_req, res) => {
@@ -241,18 +271,20 @@ app.post("/api/chat", chatRateLimiter, async (req, res) => {
     return;
   }
 
-  const { message, sessionId = "default" } = req.body;
+  const parsed = chatMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request",
+      details: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+    return;
+  }
+
+  const { message, sessionId } = parsed.data;
   const requestId = req.requestId || "unknown";
-
-  if (!message || typeof message !== "string") {
-    res.status(400).json({ error: "Message is required" });
-    return;
-  }
-
-  if (message.length > 10000) {
-    res.status(400).json({ error: "Message too long (max 10000 characters)" });
-    return;
-  }
 
   try {
     const chat = sessionManager.getSession(sessionId);
@@ -290,38 +322,39 @@ app.get("/api/chat/stream", chatRateLimiter, async (req, res) => {
     return;
   }
 
-  const message = req.query.message as string;
-  const sessionId = (req.query.sessionId as string) || "default";
-
-  if (!message) {
-    res.status(400).json({ error: "Message query parameter is required" });
+  const message = typeof req.query.message === "string" ? req.query.message : "";
+  const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "default";
+  const parsed = chatMessageSchema.safeParse({ message, sessionId });
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request",
+      details: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
     return;
   }
 
-  if (message.length > 10000) {
-    res.status(400).json({ error: "Message too long (max 10000 characters)" });
-    return;
-  }
-
-  const chat = sessionManager.getSession(sessionId);
+  const chat = sessionManager.getSession(parsed.data.sessionId);
   if (!chat) {
     res.status(503).json({ error: "Chat service unavailable" });
     return;
   }
 
   // Set up SSE headers
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
   res.flushHeaders();
 
-  logEvents.aiRequest(sessionId, message.length);
+  logEvents.aiRequest(parsed.data.sessionId, parsed.data.message.length);
   const startTime = Date.now();
   let fullResponse = "";
 
   try {
-    for await (const chunk of chat.chatStream(message)) {
+    for await (const chunk of chat.chatStream(parsed.data.message)) {
       fullResponse += chunk;
       // Send SSE formatted data
       res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
@@ -335,16 +368,16 @@ app.get("/api/chat/stream", chatRateLimiter, async (req, res) => {
     }
     disclaimerEnforcer.enforce(finalResponse);
 
-    sessionManager.recordMessage(sessionId);
+    sessionManager.recordMessage(parsed.data.sessionId);
     const durationMs = Date.now() - startTime;
-    logEvents.aiResponse(sessionId, fullResponse.length, durationMs);
+    logEvents.aiResponse(parsed.data.sessionId, fullResponse.length, durationMs);
 
     // Send done signal
-    res.write(`data: ${JSON.stringify({ done: true, sessionId })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, sessionId: parsed.data.sessionId })}\n\n`);
     res.end();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Stream failed";
-    logEvents.aiError(sessionId, errorMessage);
+    logEvents.aiError(parsed.data.sessionId, errorMessage);
     res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
     res.end();
   }
@@ -357,37 +390,37 @@ app.post("/api/chat/stream", chatRateLimiter, async (req, res) => {
     return;
   }
 
-  const { message, sessionId = "default" } = req.body;
-
-  if (!message || typeof message !== "string") {
-    res.status(400).json({ error: "Message is required" });
+  const parsed = chatMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request",
+      details: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
     return;
   }
 
-  if (message.length > 10000) {
-    res.status(400).json({ error: "Message too long (max 10000 characters)" });
-    return;
-  }
-
-  const chat = sessionManager.getSession(sessionId);
+  const chat = sessionManager.getSession(parsed.data.sessionId);
   if (!chat) {
     res.status(503).json({ error: "Chat service unavailable" });
     return;
   }
 
   // Set up SSE headers
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  logEvents.aiRequest(sessionId, message.length);
+  logEvents.aiRequest(parsed.data.sessionId, parsed.data.message.length);
   const startTime = Date.now();
   let fullResponse = "";
 
   try {
-    for await (const chunk of chat.chatStream(message)) {
+    for await (const chunk of chat.chatStream(parsed.data.message)) {
       fullResponse += chunk;
       res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
     }
@@ -399,15 +432,15 @@ app.post("/api/chat/stream", chatRateLimiter, async (req, res) => {
     }
     disclaimerEnforcer.enforce(finalResponse);
 
-    sessionManager.recordMessage(sessionId);
+    sessionManager.recordMessage(parsed.data.sessionId);
     const durationMs = Date.now() - startTime;
-    logEvents.aiResponse(sessionId, fullResponse.length, durationMs);
+    logEvents.aiResponse(parsed.data.sessionId, fullResponse.length, durationMs);
 
-    res.write(`data: ${JSON.stringify({ done: true, sessionId })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, sessionId: parsed.data.sessionId })}\n\n`);
     res.end();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Stream failed";
-    logEvents.aiError(sessionId, errorMessage);
+    logEvents.aiError(parsed.data.sessionId, errorMessage);
     res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
     res.end();
   }
@@ -422,25 +455,7 @@ app.post("/api/chat/clear", (req, res) => {
 
 // Serve web UI
 app.get("/", (_req, res) => {
-  if (OPENAI_API_KEY) {
-    res.sendFile(path.join(__dirname, "web", "index.html"));
-  } else {
-    // Return API info if no OpenAI key
-    res.json({
-      name: "Healthcare API MCP",
-      version: "1.0.0",
-      protocol: "MCP Streamable HTTP (JSON-RPC 2.0)",
-      protocolVersion: "2024-11-05",
-      providers: ["openfda", "clinical_guidelines", "cms_pricing"],
-      ai_enabled: false,
-      message: "Set OPENAI_API_KEY to enable the AI chat interface",
-      endpoints: {
-        mcp: "/mcp (POST) - MCP endpoint",
-        tools: "/mcp/tools (GET) - List tools",
-        call: "/mcp/call (POST) - Execute tool",
-      },
-    });
-  }
+  res.sendFile(path.join(__dirname, "web", "index.html"));
 });
 
 // MCP Streamable HTTP endpoint (JSON-RPC 2.0)
@@ -449,6 +464,10 @@ app.post("/mcp", mcpRateLimiter, handleMcpRequest);
 // Legacy REST endpoints (for easier testing)
 app.get("/mcp/tools", handleLegacyToolsList);
 app.post("/mcp/call", mcpRateLimiter, handleLegacyToolCall);
+
+if (monitoring.errorHandler) {
+  app.use(monitoring.errorHandler);
+}
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -476,6 +495,12 @@ function shutdown() {
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "unhandled promise rejection");
+});
+process.on("uncaughtException", (error) => {
+  logger.error({ error }, "uncaught exception");
+});
 
 // Initialize and start server
 function main(): void {

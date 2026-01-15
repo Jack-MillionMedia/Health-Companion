@@ -4,6 +4,8 @@ import { OpenAI } from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionTool, ChatCompletionChunk } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import { queryCache } from "../utils/query-cache.js";
+import { aiLogger } from "../utils/logger.js";
+import { env } from "../utils/env.js";
 
 // Tool definitions for OpenAI function calling
 const HEALTHCARE_TOOLS: ChatCompletionTool[] = [
@@ -272,10 +274,10 @@ export class HealthcareChat {
   private conversationHistory: ChatCompletionMessageParam[] = [];
   private toolExecutor: ToolExecutor;
   // Model can be configured via OPENAI_MODEL env var
-  private static readonly MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
+  private static readonly MODEL = env.OPENAI_MODEL;
   // Max tokens - configurable via env var
-  private static readonly MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS) || 8192;
-  private static readonly TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE) || 0.2;
+  private static readonly MAX_TOKENS = env.OPENAI_MAX_TOKENS;
+  private static readonly TEMPERATURE = env.OPENAI_TEMPERATURE;
   private static readonly MAX_TOOL_ROUNDS = 5; // Prevent infinite loops
   private static readonly FINAL_SYSTEM_PROMPT =
     "Provide a complete, user-facing response now. Do not call tools. Follow the system rules and include citations if available.";
@@ -314,7 +316,7 @@ export class HealthcareChat {
           };
         }
 
-        console.log(`🔧 [Parallel] Calling tool: ${toolName}`);
+        aiLogger.debug({ toolName }, "executing tool in parallel");
 
         try {
           const result = await this.toolExecutor(toolName, toolArgs);
@@ -334,7 +336,7 @@ export class HealthcareChat {
     );
 
     const duration = Date.now() - startTime;
-    console.log(`⚡ Executed ${toolCalls.length} tools in parallel: ${duration}ms`);
+    aiLogger.info({ toolCalls: toolCalls.length, durationMs: duration }, "parallel tools executed");
 
     return results;
   }
@@ -392,7 +394,7 @@ export class HealthcareChat {
 
       return this.getMessageContent(response) || HealthcareChat.FALLBACK_MESSAGE;
     } catch (error) {
-      console.error("Final response fallback failed:", error);
+      aiLogger.error({ error }, "final response fallback failed");
       return HealthcareChat.FALLBACK_MESSAGE;
     }
   }
@@ -404,7 +406,7 @@ export class HealthcareChat {
     // 🚀 SPEED: Check query cache first for instant response
     const cachedResponse = queryCache.get(userMessage);
     if (cachedResponse) {
-      console.log("⚡ Query cache hit - instant response");
+      aiLogger.debug("query cache hit");
       this.conversationHistory.push({ role: "user", content: userMessage });
       this.conversationHistory.push({ role: "assistant", content: cachedResponse });
       return cachedResponse;
@@ -417,7 +419,7 @@ export class HealthcareChat {
     for (let attempt = 0; attempt <= HealthcareChat.MAX_RETRIES; attempt++) {
       try {
         if (attempt > 0) {
-          console.log(`🔄 Retry attempt ${attempt}/${HealthcareChat.MAX_RETRIES}...`);
+          aiLogger.warn({ attempt, maxRetries: HealthcareChat.MAX_RETRIES }, "retrying AI request");
           await this.sleep(HealthcareChat.RETRY_DELAY_MS * attempt);
         }
 
@@ -427,7 +429,7 @@ export class HealthcareChat {
 
         let message = response.choices[0]?.message;
         if (!message) {
-          console.warn("⚠️ Missing response message; forcing final response.");
+          aiLogger.warn("missing response message; forcing final response");
           const forced = await this.forceFinalResponse();
           this.conversationHistory.push({ role: "assistant", content: forced });
           queryCache.set(userMessage, forced);
@@ -460,17 +462,27 @@ export class HealthcareChat {
 
         // Detailed debugging for empty responses
         const choice = response.choices[0];
-        console.log(`📊 Model response: finish_reason=${choice.finish_reason}, hasContent=${!!message.content}, model=${HealthcareChat.MODEL}`);
+        aiLogger.info(
+          { finishReason: choice.finish_reason, hasContent: !!message.content, model: HealthcareChat.MODEL },
+          "model response metadata"
+        );
         if (response.usage) {
-          console.log(`📊 Token usage: prompt=${response.usage.prompt_tokens}, completion=${response.usage.completion_tokens}, total=${response.usage.total_tokens}`);
+          aiLogger.info(
+            {
+              prompt: response.usage.prompt_tokens,
+              completion: response.usage.completion_tokens,
+              total: response.usage.total_tokens,
+            },
+            "token usage"
+          );
         }
         if (message.refusal) {
-          console.warn(`🚫 Model refusal: ${message.refusal}`);
+          aiLogger.warn({ refusal: message.refusal }, "model refusal");
         }
 
         // Handle empty response more gracefully
         if (!message.content || toolRounds >= HealthcareChat.MAX_TOOL_ROUNDS) {
-          console.warn("⚠️ Empty response or tool loop limit reached; forcing final response.");
+          aiLogger.warn("empty response or tool loop limit reached; forcing final response");
         }
 
         let assistantResponse = message.content ||
@@ -490,7 +502,7 @@ export class HealthcareChat {
         return assistantResponse;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`Chat error (attempt ${attempt + 1}):`, lastError.message);
+        aiLogger.error({ attempt: attempt + 1, error: lastError.message }, "chat error");
 
         // Only retry on transient errors
         if (!this.isRetryableError(error) || attempt === HealthcareChat.MAX_RETRIES) {
@@ -582,7 +594,7 @@ export class HealthcareChat {
       });
 
     } catch (error) {
-      console.error("Stream error:", error);
+      aiLogger.error({ error }, "stream error");
       yield `Sorry, I encountered an error: ${error instanceof Error ? error.message : String(error)}`;
     }
   }

@@ -6,7 +6,9 @@ An **elite, production-grade** healthcare information assistant. Features **13 t
 ![Healthcare AI](https://img.shields.io/badge/AI-GPT--5--nano-blue)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyour-username%2Fhealthcare-mcp)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FJack-MillionMedia%2FHealth-Companion&project-name=health-companion&repository-name=health-companion)
+
+> ⚕️ **Medical Disclaimer**: This app provides educational information and is **not medical advice**. Always consult a qualified healthcare professional for medical decisions.
 
 
 ## Features (13 Tools)
@@ -43,10 +45,10 @@ npm install
 
 ### 2. Set up environment variables
 ```bash
-# Copy the example environment file
-cp .env.example .env
+# Copy the environment template
+cp env.sample .env
 
-# Edit .env and add your OpenAI API key
+# Edit .env and add your OpenAI API key (required for chat)
 # Get one at: https://platform.openai.com/api-keys
 ```
 
@@ -79,6 +81,13 @@ Visit **http://localhost:3000** in your browser
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
+## Vercel Deployment
+
+1. Create a new Vercel project and set the **Root Directory** to `healthcare-mcp`.
+2. Add environment variables (at minimum `OPENAI_API_KEY`).
+3. Build command: `npm run build` (already configured in `vercel.json`).
+4. Deploy. The app will serve the UI at `/` and the API at `/api/chat`.
+
 The AI assistant:
 1. Receives your healthcare question
 2. Automatically calls the right tools (drug lookup, adverse events, etc.)
@@ -98,6 +107,16 @@ The AI assistant:
 | `/mcp` | POST | MCP JSON-RPC 2.0 endpoint |
 | `/mcp/tools` | GET | List available tools (legacy) |
 | `/mcp/call` | POST | Execute a tool (legacy) |
+
+## Scripts
+
+```bash
+npm run dev       # start dev server
+npm run test      # run unit tests
+npm run lint      # eslint
+npm run typecheck # tsc --noEmit
+npm run build     # production build
+```
 
 ### Performance Optimizations
 - ⚡ **Parallel tool execution** - 60-70% latency reduction
@@ -229,15 +248,18 @@ curl -X POST http://localhost:3000/mcp/call \
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OPENAI_API_KEY` | For chat | - | OpenAI API key. Tools work without it, chat requires it. |
+| `OPENAI_MODEL` | No | gpt-5-nano-2025-08-07 | OpenAI model id |
+| `OPENAI_MAX_TOKENS` | No | 8192 | Max completion tokens |
+| `OPENAI_TEMPERATURE` | No | 0.2 | Response creativity (0-2) |
 | `PORT` | No | 3000 | Server port |
 | `NODE_ENV` | No | development | Set to `production` for JSON logs |
 | `LOG_LEVEL` | No | info | Logging level (trace, debug, info, warn, error) |
-| `REDIS_HOST` | No | - | Redis host for distributed caching (optional) |
-| `REDIS_PORT` | No | 6379 | Redis port |
 | `OPENFDA_API_KEY` | No | - | OpenFDA API key for higher rate limits |
 | `NCBI_API_KEY` | No | - | NCBI/PubMed API key for guidelines search |
+| `SENTRY_DSN` | No | - | Enable Sentry error monitoring |
+| `SENTRY_TRACES_SAMPLE_RATE` | No | 0.1 | Sentry performance sampling (0-1) |
 
-See `.env.example` for a complete template with documentation.
+See `env.sample` for a complete template with documentation.
 
 ## Docker
 

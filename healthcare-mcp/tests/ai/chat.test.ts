@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HealthcareChat } from '../../src/ai/chat';
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 
 // Mock OpenAI
 vi.mock('openai', () => {
     return {
-        default: vi.fn().mockImplementation(function () {
+        OpenAI: vi.fn().mockImplementation(function () {
             return {
                 chat: {
                     completions: {

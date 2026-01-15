@@ -26,6 +26,16 @@ const limitParam = (defaultVal: number, maxVal: number) =>
     .transform((val) => Math.min(val ?? defaultVal, maxVal));
 
 // ============================================================================
+// CHAT SCHEMA
+// ============================================================================
+
+export const chatMessageSchema = z.object({
+  message: sanitizedString(10000).describe("User message"),
+  sessionId: z.string().trim().max(100).optional().default("default"),
+});
+export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
+
+// ============================================================================
 // OPENFDA TOOL SCHEMAS (4 tools)
 // ============================================================================
 

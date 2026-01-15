@@ -83,6 +83,59 @@
         radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%);
     }
 
+    .banner {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-lg);
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--color-primary);
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .banner.visible {
+      display: block;
+    }
+
+    .input-disclaimer {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--color-primary-light);
+    }
+
+    .send-btn:disabled,
+    .chat-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading-dots::after {
+      content: '...';
+      display: inline-block;
+      width: 1.2em;
+      animation: dots 1s infinite ease-in-out;
+    }
+
+    @keyframes dots {
+      0% {
+        opacity: 0.2;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0.2;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
     /* Glass Effect Utility */
     .glass-panel {
       background: var(--bg-glass);
@@ -1180,7 +1233,7 @@
       <div class="brand">
         <h1>Health Companion</h1>
       </div>
-      <div class="status-indicator status-healthy" id="systemStatus" onclick="toggleStatusPanel(event)">
+      <div class="status-indicator status-healthy" id="systemStatus" onclick="toggleStatusPanel(event)" aria-label="System status">
         <div class="status-dot"></div>
         <span class="status-text">System Elite: <strong id="statusLabel">Initializing...</strong></span>
         <svg class="status-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1231,6 +1284,7 @@
       </div>
     </header>
 
+    <div class="banner" id="configBanner" role="status"></div>
     <div class="dashboard">
       <!-- Sidebar -->
       <aside class="sidebar">
@@ -1313,7 +1367,7 @@
 
       <!-- Chat Interface -->
       <main class="chat-panel glass-panel">
-        <div class="chat-messages" id="chatMessages">
+        <div class="chat-messages" id="chatMessages" role="log" aria-live="polite">
           <div class="message assistant">
             <h3>Hello. I am your elite health assistant.</h3>
             <p>I verify all information against FDA databases and clinical trials. <br>
@@ -1322,14 +1376,15 @@
         </div>
 
         <div class="input-area">
-          <input type="text" class="chat-input" id="chatInput"
+          <input type="text" class="chat-input" id="chatInput" aria-label="Chat input"
             placeholder="Ask about symptoms, drugs, or clinical trials...">
-          <button class="send-btn" id="sendBtn">
+          <button class="send-btn" id="sendBtn" aria-label="Send message">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </button>
         </div>
+        <div class="input-disclaimer">⚕️ This is educational information, not medical advice.</div>
       </main>
     </div>
   </div>
@@ -1349,6 +1404,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
   <script>
     // Expanded list of ~40 common medications
     const COMMON_DRUGS = [
@@ -1711,6 +1767,7 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
     function init() {
       renderQuickAdd();
       setupEventListeners();
+      loadConfig();
     }
 
     function renderQuickAdd() {
@@ -1802,6 +1859,9 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
     }
 
     async function sendMessage() {
+      if (document.getElementById('chatInput').disabled) {
+        return;
+      }
       const input = document.getElementById('chatInput');
       const text = input.value.trim();
       if (!text) return;
@@ -1824,7 +1884,7 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
         // Remove loading
         document.getElementById(loadingId).remove();
 
-        if (data.error) {
+        if (!response.ok || data.error) {
           addMessage('assistant', `❌ Error: ${data.error}`);
         } else {
           addMessage('assistant', data.response);
@@ -1842,7 +1902,8 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
       div.id = 'msg-' + Date.now();
 
       if (role === 'assistant' && !content.includes('loading-dots')) {
-        div.innerHTML = marked.parse(content);
+        const html = marked.parse(content);
+        div.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
       } else {
         div.innerHTML = content;
       }
@@ -1966,6 +2027,35 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
 
     // Start
     init();
+
+    async function loadConfig() {
+      const banner = document.getElementById('configBanner');
+      try {
+        const infoRes = await fetch('/api/info');
+        const info = await infoRes.json();
+        if (!info.ai_enabled) {
+          setChatDisabled(true, 'AI chat is disabled. Add an OpenAI API key on the server to enable the assistant.');
+        }
+      } catch (error) {
+        setChatDisabled(true, 'Unable to reach the server configuration. Check your connection.');
+      }
+    }
+
+    function setChatDisabled(disabled, message) {
+      const input = document.getElementById('chatInput');
+      const button = document.getElementById('sendBtn');
+      const banner = document.getElementById('configBanner');
+
+      input.disabled = disabled;
+      button.disabled = disabled;
+
+      if (disabled) {
+        banner.textContent = message;
+        banner.classList.add('visible');
+      } else {
+        banner.classList.remove('visible');
+      }
+    }
   </script>
 </body>
 

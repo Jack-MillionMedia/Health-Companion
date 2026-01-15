@@ -50,9 +50,9 @@ curl -s localhost:3000/health | jq
 **Symptom:** Getting 429 responses
 
 **Limits:**
-- API: 100 requests/15 min per IP
-- Chat: 20 requests/min per IP
-- MCP: 200 requests/min per IP
+- API: 100 requests/min per IP
+- Chat: 30 requests/min per IP
+- MCP: 100 requests/min per IP
 
 **Fix:** Wait for window to reset. For legitimate high traffic, deploy multiple instances.
 
@@ -116,8 +116,14 @@ docker stop healthcare-mcp && docker rm healthcare-mcp
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OPENAI_API_KEY` | For chat | - | OpenAI API key |
+| `OPENAI_MODEL` | No | gpt-5-nano-2025-08-07 | OpenAI model id |
+| `OPENAI_MAX_TOKENS` | No | 8192 | Max completion tokens |
+| `OPENAI_TEMPERATURE` | No | 0.2 | Response creativity (0-2) |
 | `PORT` | No | 3000 | Server port |
 | `NODE_ENV` | No | development | Set to `production` for JSON logs |
+| `LOG_LEVEL` | No | info | Logging level |
+| `SENTRY_DSN` | No | - | Enable Sentry error monitoring |
+| `SENTRY_TRACES_SAMPLE_RATE` | No | 0.1 | Sentry performance sampling |
 
 ---
 
