@@ -110,11 +110,11 @@ sessionManager.setChatFactory((sessionId: string) => {
   return new HealthcareChat(OPENAI_API_KEY, executeToolForAI);
 });
 
-// Security & middleware
-const helmetMiddleware =
-  (helmet as unknown as { default?: typeof helmet }).default ?? helmet;
+/**
+ * Security middleware
+ */
 app.use(
-  helmetMiddleware({
+  helmet({
     // UI uses inline styles/scripts; keep CSP off until assets are externalized
     contentSecurityPolicy: false,
   })
@@ -511,9 +511,6 @@ function main(): void {
   logger.info("   🏥 Healthcare AI Assistant v1.0.0   ");
   logger.info("═══════════════════════════════════════");
 
-  // Register all tools
-  registerAllTools();
-
   const toolCount = 13;
 
   // Log startup info
@@ -538,6 +535,9 @@ function main(): void {
   });
 }
 
+// Register all tools immediately when module is loaded
+// This ensures tools are available even when running in serverless mode (where main() isn't called)
+registerAllTools();
 
 // Export app for Vercel/Serverless
 export default app;
