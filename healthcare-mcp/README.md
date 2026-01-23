@@ -36,6 +36,11 @@ An **elite, production-grade** healthcare information assistant. Features **13 t
 - **medicare_drug_pricing** - Medicare Part D drug spending and pricing
 - **procedure_pricing** - Medicare procedure costs by HCPCS/CPT code
 
+### 🛡️ Reliability & UX (Elite)
+- **Offline & Resilience** - Visual banners when offline, automatic reconnection.
+- **Persistence** - Local cabinet data survives page reloads.
+- **Accessibility** - Full ARIA support, keyboard navigation, and screen reader optimization.
+
 ## Quick Start
 
 ### 1. Install dependencies

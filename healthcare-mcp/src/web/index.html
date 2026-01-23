@@ -11,9 +11,10 @@
   <!-- Preload fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://api.fda.gov">
   <link
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap"
-    rel="stylesheet">
+    rel="stylesheet" fetchpriority="high">
 
   <style>
     /* ═══════════════════════════════════════════════════════════════════════════
@@ -120,9 +121,11 @@
       0% {
         opacity: 0.2;
       }
+
       50% {
         opacity: 1;
       }
+
       100% {
         opacity: 0.2;
       }
@@ -137,12 +140,24 @@
     }
 
     /* Glass Effect Utility */
+    /* Glass Effect Utility */
     .glass-panel {
       background: var(--bg-glass);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--border-glass);
       box-shadow: var(--shadow-lg);
+    }
+
+    /* Accessibility Focus Styles */
+    :focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    /* Remove default focus if custom focus-visible is supported (optional, but robust) */
+    :focus:not(:focus-visible) {
+      outline: none;
     }
 
     .app-container {
@@ -195,11 +210,11 @@
       }
 
       .chat-panel {
-        order: 1;
+        order: 2;
       }
 
       #quickActionsCard {
-        order: 2;
+        order: 1;
       }
 
       .sidebar>.card:not(#quickActionsCard),
@@ -241,6 +256,10 @@
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 0.75rem;
+      content-visibility: auto;
+      /* Performance: skip rendering off-screen */
+      contain-intrinsic-size: 0 500px;
+      /* Estimate size to prevent scroll jank */
     }
 
     .quick-add-btn {
@@ -276,6 +295,8 @@
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+      content-visibility: auto;
+      contain-intrinsic-size: 0 100px;
     }
 
     .med-item {
@@ -367,6 +388,14 @@
 
     .chat-input:focus {
       outline: none;
+      /* Fallback */
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .chat-input:focus-visible {
+      outline: none;
+      /* Let box-shadow handle it matching design */
       border-color: var(--color-accent);
       box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
     }
@@ -655,6 +684,12 @@
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
+    .custom-med-input:focus-visible {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
     .custom-med-input::placeholder {
       color: var(--color-primary-light);
       opacity: 0.6;
@@ -700,6 +735,12 @@
     }
 
     .drug-search-input:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .drug-search-input:focus-visible {
       outline: none;
       border-color: var(--color-accent);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -916,6 +957,14 @@
     .modal-field input:focus,
     .modal-field textarea:focus,
     .modal-field select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .modal-field input:focus-visible,
+    .modal-field textarea:focus-visible,
+    .modal-field select:focus-visible {
       outline: none;
       border-color: var(--color-accent);
       box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
@@ -1223,17 +1272,77 @@
         transform: rotate(360deg);
       }
     }
+
+    /* TOAST NOTIFICATIONS */
+    .toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      z-index: 2000;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      color: var(--color-primary);
+      padding: 1rem 1.5rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      border-left: 4px solid var(--color-accent);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      min-width: 300px;
+      pointer-events: auto;
+      animation: toastSlideIn 0.3s var(--ease-elastic);
+    }
+
+    .toast.success {
+      border-left-color: var(--color-success);
+    }
+
+    .toast.error {
+      border-left-color: var(--color-danger);
+    }
+
+    .toast.warning {
+      border-left-color: var(--color-warning);
+    }
+
+    @keyframes toastSlideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes toastSlideOut {
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <div class="toast-container" id="toastContainer"></div>
   <div class="app-container">
     <!-- Header -->
     <header class="header glass-panel">
       <div class="brand">
         <h1>Health Companion</h1>
       </div>
-      <div class="status-indicator status-healthy" id="systemStatus" onclick="toggleStatusPanel(event)" aria-label="System status">
+      <div class="status-indicator status-healthy" id="systemStatus" onclick="toggleStatusPanel(event)"
+        aria-label="System status">
         <div class="status-dot"></div>
         <span class="status-text">System Elite: <strong id="statusLabel">Initializing...</strong></span>
         <svg class="status-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1343,16 +1452,17 @@
           </div>
           <div class="custom-med-input-container">
             <input type="text" id="customMedInput" class="custom-med-input" placeholder="Add your own medication..."
-              onkeypress="handleCustomMedKeypress(event)">
-            <button class="custom-med-add-btn" onclick="addCustomMedication()">+ Add</button>
+              aria-label="Add custom medication" onkeypress="handleCustomMedKeypress(event)">
+            <button class="custom-med-add-btn" onclick="addCustomMedication()" aria-label="Add medication">+
+              Add</button>
           </div>
         </div>
 
         <!-- Common Drugs Section (Third) -->
         <div class="card glass-panel">
           <h3 class="section-title">Common Drugs (Quick Add)</h3>
-          <input type="text" id="drugSearchInput" class="drug-search-input" placeholder="🔍 Search medications..."
-            oninput="filterDrugList()">
+          <input type="search" id="drugSearchInput" class="drug-search-input" placeholder="🔍 Search medications..."
+            autocomplete="off" aria-label="Search medications" oninput="handleSearchInput(event)">
           <div class="quick-add-grid" id="quickAddGrid">
             <!-- Buttons injected by JS -->
           </div>
@@ -1390,12 +1500,12 @@
   </div>
 
   <!-- Quick Action Modal -->
-  <div class="modal-overlay" id="quickActionModal">
+  <div class="modal-overlay" id="quickActionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-header">
         <span class="icon" id="modalIcon">⚗️</span>
         <h2 id="modalTitle">Quick Action</h2>
-        <button class="modal-close" onclick="closeModal()">×</button>
+        <button class="modal-close" onclick="closeModal()" aria-label="Close modal">×</button>
       </div>
       <div class="modal-body" id="modalBody">
         <!-- Dynamic fields injected here -->
@@ -1637,17 +1747,17 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
         if (field.type === 'chips') {
           return `
             <div class="modal-field">
-              <label>${field.label}</label>
+              <label for="chipInput">${field.label}</label>
               <div class="chip-container" id="chipContainer">
                 <input type="text" class="chip-input" id="chipInput" placeholder="${field.placeholder}"
-                       onkeydown="handleChipInput(event)">
+                       onkeydown="handleChipInput(event)" aria-label="${field.label}">
               </div>
             </div>
           `;
         } else if (field.type === 'select') {
           return `
             <div class="modal-field">
-              <label>${field.label}</label>
+              <label for="field_${field.id}">${field.label}</label>
               <select id="field_${field.id}">
                 ${field.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
               </select>
@@ -1656,14 +1766,14 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
         } else if (field.type === 'textarea') {
           return `
             <div class="modal-field">
-              <label>${field.label}</label>
+              <label for="field_${field.id}">${field.label}</label>
               <textarea id="field_${field.id}" placeholder="${field.placeholder}"></textarea>
             </div>
           `;
         } else {
           return `
             <div class="modal-field">
-              <label>${field.label}</label>
+              <label for="field_${field.id}">${field.label}</label>
               <input type="text" id="field_${field.id}" placeholder="${field.placeholder}">
             </div>
           `;
@@ -1679,6 +1789,12 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
       }
 
       document.getElementById('quickActionModal').classList.add('active');
+
+      // Auto-focus first input
+      setTimeout(() => {
+        const firstInput = document.getElementById('quickActionModal').querySelector('input, select, textarea');
+        if (firstInput) firstInput.focus();
+      }, 100);
     };
 
     window.closeModal = () => {
@@ -1722,7 +1838,7 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
       container.innerHTML = state.modalDrugs.map((drug, i) => `
         <span class="chip">
           ${drug}
-          <button class="chip-remove" onclick="removeChip(${i})">×</button>
+          <button class="chip-remove" onclick="removeChip(${i})" aria-label="Remove ${drug}">×</button>
         </span>
       `).join('') + inputHTML;
     }
@@ -1748,10 +1864,10 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
       // Validate required fields
       const firstField = action.fields[0];
       if (firstField.type === 'chips' && data[firstField.id].length === 0) {
-        alert('Please add at least one medication');
+        showToast('Please add at least one medication', 'error');
         return;
       } else if (firstField.type !== 'chips' && !data[firstField.id]) {
-        alert(`Please fill in the ${firstField.label}`);
+        showToast(`Please fill in the ${firstField.label}`, 'error');
         return;
       }
 
@@ -1765,10 +1881,57 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
 
     // Initialize UI
     function init() {
+      // Load from localStorage
+      loadState();
       renderQuickAdd();
       setupEventListeners();
       loadConfig();
+      renderMedList();
+
+      // Online/Offline Listeners
+      window.addEventListener('online', () => {
+        showToast('Connection restored', 'success');
+        updateSystemStatus();
+      });
+      window.addEventListener('offline', () => {
+        showToast('You are offline. Some features may be unavailable.', 'error');
+        const statusEl = document.getElementById('systemStatus');
+        if (statusEl) statusEl.className = 'status-indicator status-unhealthy';
+        document.getElementById('statusLabel').textContent = 'Offline';
+      });
     }
+
+    function saveState() {
+      try {
+        localStorage.setItem('elite_medications', JSON.stringify(Array.from(state.medications)));
+      } catch (e) { console.error('Save failed', e); }
+    }
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem('elite_medications');
+        if (saved) {
+          const meds = JSON.parse(saved);
+          meds.forEach(m => state.medications.add(m));
+        }
+      } catch (e) { console.error('Load failed', e); }
+    }
+
+    // Toast Utility
+    window.showToast = (message, type = 'default') => {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+
+      container.appendChild(toast);
+
+      // Auto remove
+      setTimeout(() => {
+        toast.style.animation = 'toastSlideOut 0.3s var(--ease-elastic) forwards';
+        toast.addEventListener('animationend', () => toast.remove());
+      }, 3000);
+    };
 
     function renderQuickAdd() {
       const grid = document.getElementById('quickAddGrid');
@@ -1777,6 +1940,25 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
           <span></span> ${drug}
         </button>
       `).join('');
+    }
+
+    // Debounce Utility (Performance)
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    const debouncedFilter = debounce(filterDrugList, 150);
+
+    function handleSearchInput(event) {
+      debouncedFilter();
     }
 
     // Filter drug list based on search input
@@ -1801,23 +1983,29 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
         return;
       }
       list.innerHTML = Array.from(state.medications).map(med => `
-        <div class="med-item">
           <span>${med}</span>
-          <button onclick="removeMedication('${med}')" style="background: none; border: none; cursor: pointer; color: var(--color-danger);">✕</button>
+          <button onclick="removeMedication('${med}')" aria-label="Remove ${med}" style="background: none; border: none; cursor: pointer; color: var(--color-danger);">✕</button>
         </div>
       `).join('');
     }
 
     window.addMedication = (med) => {
+      // Prevent duplicates
+      if (state.medications.has(med)) {
+        showToast(`Already have ${med} in cabinet`, 'warning');
+        return;
+      }
       state.medications.add(med);
       renderMedList();
-      // Optional: Auto-announce to chat
-      // addMessage('assistant', `Added **${med}** to your cabinet.`);
+      saveState();
+      showToast(`Added ${med} to cabinet`, 'success');
     };
 
     window.removeMedication = (med) => {
       state.medications.delete(med);
       renderMedList();
+      saveState();
+      showToast(`Removed ${med} from cabinet`, 'default');
     };
 
     window.addCustomMedication = () => {
@@ -1850,11 +2038,51 @@ ${data.patientInfo ? `**Patient Information:** ${data.patientInfo}` : ''}
 
       document.getElementById('checkInteractionsBtn').addEventListener('click', () => {
         if (state.medications.size < 2) {
-          addMessage('assistant', '⚠️ Please add at least 2 medications to check for interactions.');
+          showToast('Please add at least 2 medications to check for interactions', 'warning');
           return;
         }
         // Open the interactions modal with cabinet meds pre-filled
         openQuickAction('interactions');
+      });
+
+      // KEYBOARD SHORTCUTS
+      document.addEventListener('keydown', (e) => {
+        // Escape to close modal
+        if (e.key === 'Escape') {
+          const modal = document.getElementById('quickActionModal');
+          if (modal.classList.contains('active')) {
+            closeModal();
+          }
+        }
+
+        // Cmd/Ctrl + K to search
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          document.getElementById('drugSearchInput').focus();
+        }
+      });
+
+      // FOCUS TRAP
+      const modal = document.getElementById('quickActionModal');
+      modal.addEventListener('keydown', (e) => {
+        if (!modal.classList.contains('active')) return;
+        if (e.key === 'Tab') {
+          const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              last.focus();
+              e.preventDefault();
+            }
+          } else {
+            if (document.activeElement === last) {
+              first.focus();
+              e.preventDefault();
+            }
+          }
+        }
       });
     }
 
