@@ -20,7 +20,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   OPENAI_API_KEY: optionalString(200),
-  OPENAI_MODEL: z.string().trim().min(1).default("gpt-5-nano-2025-08-07"),
+  OPENAI_MODEL: z.string().trim().min(1).default("gpt-4o"),
   OPENAI_MAX_TOKENS: z.coerce.number().int().positive().max(16384).default(8192),
   OPENAI_TEMPERATURE: z.coerce.number().min(0).max(2).default(1),
   OPENFDA_API_KEY: optionalString(200),
