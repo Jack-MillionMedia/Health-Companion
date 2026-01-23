@@ -112,9 +112,10 @@ sessionManager.setChatFactory((sessionId: string) => {
 
 /**
  * Security middleware
+ * strict cast to any to avoid Vercel build TS2349 error with NodeNext
  */
 app.use(
-  helmet({
+  (helmet as any)({
     // UI uses inline styles/scripts; keep CSP off until assets are externalized
     contentSecurityPolicy: false,
   })
